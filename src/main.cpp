@@ -8,11 +8,23 @@
 int actual_main(int argc, char** argv) {
     ZoneScoped;
 
+#ifdef _WIN32
+    SetProcessDpiAwareness(PROCESS_SYSTEM_DPI_AWARE);
+#endif
+
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
         return 1;
     }
     CZ_DEFER(SDL_Quit());
+
+    float dpi_scale = 1.0f;
+    {
+        const float dpi_default = 96.0f;
+        float dpi = 0;
+        if (SDL_GetDisplayDPI(0, &dpi, NULL, NULL) == 0)
+            dpi_scale = dpi / dpi_default;
+    }
 
     if (TTF_Init() < 0) {
         fprintf(stderr, "TTF_Init failed: %s\n", TTF_GetError());
@@ -21,8 +33,8 @@ int actual_main(int argc, char** argv) {
     CZ_DEFER(TTF_Quit());
 
     SDL_Window* window =
-        SDL_CreateWindow("MYPROJECT", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 800, 800,
-                         SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+        SDL_CreateWindow("MYPROJECT", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+                         800 * dpi_scale, 800 * dpi_scale, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
     if (!window) {
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
         return 1;
