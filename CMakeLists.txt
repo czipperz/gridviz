@@ -63,7 +63,9 @@ endif()
 # Enable High DPI
 if (WIN32)
     target_link_libraries(${PROGRAM_NAME} Shcore.lib)
-    target_link_libraries(${TEST_PROGRAM_NAME} Shcore.lib)
+    if (MYPROJECT_BUILD_TESTS)
+        target_link_libraries(${TEST_PROGRAM_NAME} Shcore.lib)
+    endif()
 endif()
 
 # Warnings.
