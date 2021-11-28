@@ -119,32 +119,38 @@ int actual_main(int argc, char** argv) {
         SDL_Surface* surface = SDL_GetWindowSurface(window);
         SDL_FillRect(surface, NULL, SDL_MapRGB(surface->format, 0xff, 0xff, 0xff));
 
-        for (size_t i = 0; i < events.len; ++i) {
-            Event& event = events[i];
-            switch (event.type) {
-            case EVENT_CHAR_POINT: {
-                int64_t x = event.cp.x * rend.font_width + rend.off_x;
-                int64_t y = event.cp.y * rend.font_height + rend.off_y;
+        {
+            SDL_Rect plane_rect = {0, 0, surface->w, surface->h};
+            SDL_SetClipRect(surface, &plane_rect);
 
-                uint32_t bg =
-                    SDL_MapRGB(surface->format, event.cp.bg[0], event.cp.bg[1], event.cp.bg[2]);
-                uint32_t fg = (((uint32_t)event.cp.fg[0] << 16) | ((uint32_t)event.cp.fg[1] << 8) |
-                               ((uint32_t)event.cp.fg[2]));
+            for (size_t i = 0; i < events.len; ++i) {
+                Event& event = events[i];
+                switch (event.type) {
+                case EVENT_CHAR_POINT: {
+                    int64_t x = event.cp.x * rend.font_width + rend.off_x;
+                    int64_t y = event.cp.y * rend.font_height + rend.off_y;
 
-                char seq[5] = {(char)event.cp.ch};
-                (void)render_code_point(&rend, surface, x, y, bg, fg, seq);
-            } break;
+                    uint32_t bg =
+                        SDL_MapRGB(surface->format, event.cp.bg[0], event.cp.bg[1], event.cp.bg[2]);
+                    uint32_t fg = (((uint32_t)event.cp.fg[0] << 16) |
+                                   ((uint32_t)event.cp.fg[1] << 8) | ((uint32_t)event.cp.fg[2]));
 
-            case EVENT_KEY_FRAME:
-                CZ_PANIC("todo");
-                break;
+                    char seq[5] = {(char)event.cp.ch};
+                    (void)render_code_point(&rend, surface, x, y, bg, fg, seq);
+                } break;
 
-            default:
-                CZ_DEBUG_ASSERT(false);  // Ignore in release mode.
-                break;
+                case EVENT_KEY_FRAME:
+                    CZ_PANIC("todo");
+                    break;
+
+                default:
+                    CZ_DEBUG_ASSERT(false);  // Ignore in release mode.
+                    break;
+                }
             }
         }
 
+        SDL_SetClipRect(surface, nullptr);
         SDL_UpdateWindowSurface(window);
 
         const uint32_t frame_length = 1000 / 60;
