@@ -80,7 +80,7 @@ int actual_main(int argc, char** argv) {
     TTF_GlyphMetrics(rend.font, ' ', nullptr, nullptr, nullptr, nullptr, &rend.font_width);
 
     SDL_Window* window = SDL_CreateWindow(
-        "MYPROJECT", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, (int)(800 * rend.dpi_scale),
+        "gridviz", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, (int)(800 * rend.dpi_scale),
         (int)(800 * rend.dpi_scale), SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
     if (!window) {
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
