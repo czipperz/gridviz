@@ -130,8 +130,8 @@ int actual_main(int argc, char** argv) {
             case SDL_MOUSEMOTION:
                 // Dragging with left button.
                 if (event.motion.state & SDL_BUTTON_LMASK) {
-                    rend.off_x -= event.motion.xrel;
-                    rend.off_y -= event.motion.yrel;
+                    rend.off_x += event.motion.xrel;
+                    rend.off_y += event.motion.yrel;
                 }
                 break;
             case SDL_KEYDOWN:
@@ -157,8 +157,7 @@ int actual_main(int argc, char** argv) {
                                ((uint32_t)event.cp.fg[2]));
 
                 char seq[5] = {(char)event.cp.ch};
-                (void)render_code_point(&rend, surface, event.cp.x * rend.font_width,
-                                        event.cp.y * rend.font_height, bg, fg, seq);
+                (void)render_code_point(&rend, surface, x, y, bg, fg, seq);
             } break;
 
             case EVENT_KEY_FRAME:
@@ -171,8 +170,6 @@ int actual_main(int argc, char** argv) {
             }
         }
 
-        SDL_Rect rect = {200, 200, 100, 100};
-        SDL_FillRect(surface, &rect, SDL_MapRGB(surface->format, 0x4d, 0xe0, 0xf4));
         SDL_UpdateWindowSurface(window);
 
         const uint32_t frame_length = 1000 / 60;
