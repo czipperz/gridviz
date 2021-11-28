@@ -41,6 +41,9 @@ add_library(${LIBRARY_NAME} ${SRCS})
 # Build netgridviz library.
 add_library(netgridviz netgridviz.c)
 
+# Build congridviz command line utility.
+add_executable(congridviz congridviz.cpp)
+target_link_libraries(congridviz cz tracy)
 
 
 # Run GNU Global if it is available.

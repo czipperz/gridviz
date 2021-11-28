@@ -13,8 +13,8 @@
 
 /// Connect on the given port to the server.  Returns `0` on success, `-1` on failure.
 int netgridviz_connect(int port);
-/// Disconnect from the server.  Returns `0` on success, `-1` on failure.
-int netgridviz_disconnect(void);
+/// Disconnect from the server.
+void netgridviz_disconnect(void);
 
 /// Send data to the server.  Returns `len` on success, `-1`
 /// on failure, somewhere inbetween on partial transfer.
@@ -119,10 +119,9 @@ int netgridviz_connect(int port) {
 // Module Code - disconnect from server
 /////////////////////////////////////////////////
 
-int netgridviz_disconnect(void) {
+void netgridviz_disconnect(void) {
     closesocket(netgridviz_socket);
     netgridviz_winsock_end();
-    return 0;
 }
 
 /////////////////////////////////////////////////
@@ -197,7 +196,7 @@ static int netgridviz_connect_timeout(SOCKET sock,
 /////////////////////////////////////////////////
 
 int netgridviz_send(const void* buffer, size_t len) {
-    return send(netgridviz_socket, buffer, (len_t)len, 0);
+    return send(netgridviz_socket, (const char*)buffer, (len_t)len, 0);
 }
 
 /////////////////////////////////////////////////

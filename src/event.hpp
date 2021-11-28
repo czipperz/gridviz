@@ -1,5 +1,8 @@
 #pragma once
 
+#include <stdint.h>
+#include <cz/str.hpp>
+
 namespace gridviz {
 
 enum Event_Type {
