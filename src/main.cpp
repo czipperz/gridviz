@@ -8,9 +8,10 @@
 #include <cz/heap.hpp>
 #include <cz/str.hpp>
 
+#include "event.hpp"
 #include "global.hpp"
-#include "gridviz.hpp"
 #include "render.hpp"
+#include "server.hpp"
 
 #ifdef _WIN32
 #include <shellscalingapi.h>
@@ -33,6 +34,8 @@ int actual_main(int argc, char** argv) {
     set_program_directory();
 
     Render_State rend = {};
+    Network_State* net = nullptr;
+
     rend.font_size = 14;
 
 #ifdef _WIN32
@@ -85,40 +88,7 @@ int actual_main(int argc, char** argv) {
     CZ_DEFER(SDL_DestroyWindow(window));
 
     cz::Vector<Event> events = {};
-
-    // TODO remove dummy events
-    events.reserve(cz::heap_allocator(), 3);
-    {
-        uint8_t white[] = {0xff, 0xff, 0xff};
-        uint8_t black[] = {0x00, 0x00, 0x00};
-
-        Event event = {};
-        event.cp.type = EVENT_CHAR_POINT;
-        memcpy(event.cp.fg, white, sizeof(white));
-        memcpy(event.cp.bg, black, sizeof(black));
-        event.cp.ch = 'A';
-        event.cp.x = 0;
-        event.cp.y = 0;
-        events.push(event);
-
-        event = {};
-        event.cp.type = EVENT_CHAR_POINT;
-        memcpy(event.cp.fg, white, sizeof(white));
-        memcpy(event.cp.bg, black, sizeof(black));
-        event.cp.ch = 'B';
-        event.cp.x = 2;
-        event.cp.y = 1;
-        events.push(event);
-
-        event = {};
-        event.cp.type = EVENT_CHAR_POINT;
-        memcpy(event.cp.fg, white, sizeof(white));
-        memcpy(event.cp.bg, black, sizeof(black));
-        event.cp.ch = 'C';
-        event.cp.x = 0;
-        event.cp.y = 4;
-        events.push(event);
-    }
+    net = start_networking();
 
     while (1) {
         uint32_t start_frame = SDL_GetTicks();
@@ -142,6 +112,8 @@ int actual_main(int argc, char** argv) {
                 break;
             }
         }
+
+        poll_network(net, &events);
 
         SDL_Surface* surface = SDL_GetWindowSurface(window);
         SDL_FillRect(surface, NULL, SDL_MapRGB(surface->format, 0xff, 0xff, 0xff));
