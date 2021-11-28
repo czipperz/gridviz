@@ -15,8 +15,13 @@ int main() {
 
     srand(time(0));
 
-    netgridviz_context context = netgridviz_create_context();
-    netgridviz_send_char(&context, /*x=*/(rand() % 10), /*y=*/(rand() % 10), '#');
+    netgridviz_context c1 = netgridviz_create_context();
+    netgridviz_context c2 = netgridviz_create_context();
+
+    netgridviz_set_fg(&c1, 0xff, 0, 0);
+
+    netgridviz_send_char(&c1, /*x=*/(rand() % 10), /*y=*/(rand() % 10), '#');
+    netgridviz_send_char(&c2, /*x=*/(rand() % 10), /*y=*/(rand() % 10), 'X');
 
     netgridviz_disconnect();
 }

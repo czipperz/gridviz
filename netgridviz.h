@@ -51,13 +51,13 @@ void netgridviz_send_char(netgridviz_context* context, int64_t x, int64_t y, cha
 netgridviz_context netgridviz_make_context(uint16_t id) {
     netgridviz_context context = {id};
     // White foreground.
-    context.fg[0] = 0xff;
-    context.fg[1] = 0xff;
-    context.fg[2] = 0xff;
+    context.fg[0] = 0x00;
+    context.fg[1] = 0x00;
+    context.fg[2] = 0x00;
     // Black foreground.
-    context.bg[1] = 0x00;
-    context.bg[0] = 0x00;
-    context.bg[2] = 0x00;
+    context.bg[1] = 0xff;
+    context.bg[0] = 0xff;
+    context.bg[2] = 0xff;
     return context;
 }
 #endif
