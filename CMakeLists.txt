@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.3)
 
-# TODO: rename me!
-project(MYPROJECT)
+project(gridviz)
 
 # Force c++11.
 set(CMAKE_CXX_STANDARD 11)
@@ -25,7 +24,7 @@ endif()
 target_link_libraries(${PROGRAM_NAME} ${LIBRARY_NAME} cz tracy)
 
 # Add test program.
-if (MYPROJECT_BUILD_TESTS)
+if (GRIDVIZ_BUILD_TESTS)
     file(GLOB_RECURSE TEST_SRCS tests/*.cpp)
     add_executable(${TEST_PROGRAM_NAME} ${TEST_SRCS})
     target_include_directories(${TEST_PROGRAM_NAME} PUBLIC src cz/test_base)
@@ -69,7 +68,7 @@ endif()
 # Enable High DPI
 if (WIN32)
     target_link_libraries(${PROGRAM_NAME} Shcore.lib)
-    if (MYPROJECT_BUILD_TESTS)
+    if (GRIDVIZ_BUILD_TESTS)
         target_link_libraries(${TEST_PROGRAM_NAME} Shcore.lib)
     endif()
 endif()

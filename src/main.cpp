@@ -4,6 +4,17 @@
 #include <stdio.h>
 #include <Tracy.hpp>
 #include <cz/defer.hpp>
+#include <cz/str.hpp>
+
+#include "gridviz.hpp"
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
+
+using namespace gridviz;
 
 int actual_main(int argc, char** argv) {
     ZoneScoped;
@@ -32,6 +43,23 @@ int actual_main(int argc, char** argv) {
     }
     CZ_DEFER(TTF_Quit());
 
+#ifdef _WIN32
+    const char* font_path = "C:/Windows/Fonts/MesloLGM-Regular.ttf";
+#else
+    const char* font_path = "/usr/share/fonts/TTF/MesloLGMDZ-Regular.ttf";
+#endif
+
+    int font_size = 14;
+    TTF_Font* font = TTF_OpenFont(font_path, (int)(font_size * dpi_scale));
+    if (!font) {
+        fprintf(stderr, "TTF_OpenFont failed: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    int font_height = TTF_FontLineSkip(font);
+    int font_width = 10;
+    TTF_GlyphMetrics(rend.font, ' ', nullptr, nullptr, nullptr, nullptr, &font_width);
+
     SDL_Window* window =
         SDL_CreateWindow("MYPROJECT", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                          800 * dpi_scale, 800 * dpi_scale, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
@@ -40,6 +68,39 @@ int actual_main(int argc, char** argv) {
         return 1;
     }
     CZ_DEFER(SDL_DestroyWindow(window));
+
+    cz::Vector<Event> events = {};
+
+    // TODO remove dummy events
+    events.reserve(cz::heap_allocator(), 3);
+    {
+        Event event = {};
+        event.cp.type = EVENT_CHAR_POINT;
+        event.cp.fg = {0xff, 0xff, 0xff};
+        event.cp.bg = {0x00, 0x00, 0x00};
+        event.cp.ch = 'A';
+        event.cp.x = 0;
+        event.cp.y = 0;
+        events.push(event);
+
+        Event event = {};
+        event.cp.type = EVENT_CHAR_POINT;
+        event.cp.fg = {0xff, 0xff, 0xff};
+        event.cp.bg = {0x00, 0x00, 0x00};
+        event.cp.ch = 'B';
+        event.cp.x = 2;
+        event.cp.y = 1;
+        events.push(event);
+
+        Event event = {};
+        event.cp.type = EVENT_CHAR_POINT;
+        event.cp.fg = {0xff, 0xff, 0xff};
+        event.cp.bg = {0x00, 0x00, 0x00};
+        event.cp.ch = 'C';
+        event.cp.x = 0;
+        event.cp.y = 4;
+        events.push(event);
+    }
 
     while (1) {
         uint32_t start_frame = SDL_GetTicks();
@@ -56,7 +117,25 @@ int actual_main(int argc, char** argv) {
         }
 
         SDL_Surface* surface = SDL_GetWindowSurface(window);
-        SDL_FillRect(surface, NULL, SDL_MapRGB(surface->format, 0, 0, 0));
+        SDL_FillRect(surface, NULL, SDL_MapRGB(surface->format, 0xff, 0xff, 0xff));
+
+        for (size_t i = 0; i < events.len; ++i) {
+            Event& event = events[i];
+            switch (event.type) {
+            case EVENT_CHAR_POINT:
+                CZ_PANIC("todo");
+                break;
+
+            case EVENT_KEY_FRAME:
+                CZ_PANIC("todo");
+                break;
+
+            default:
+                CZ_DEBUG_ASSERT(false); // Ignore in release mode.
+                break;
+            }
+        }
+
         SDL_Rect rect = {200, 200, 100, 100};
         SDL_FillRect(surface, &rect, SDL_MapRGB(surface->format, 0x4d, 0xe0, 0xf4));
         SDL_UpdateWindowSurface(window);
