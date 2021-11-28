@@ -104,16 +104,18 @@ static int64_t compare_surface_cache(const Surface_Cache& left, const Surface_Ca
 
 static SDL_Surface* rasterize_code_point_cached(Render_State* rend,
                                                 const char seq[5],
-                                                uint32_t color) {
+                                                SDL_Color color) {
     uint32_t code_point = unicode::utf8_code_point((const uint8_t*)seq);
 
     // Find the cache for this color.
     size_t index;
-    Surface_Cache fake_cache = {color};
+    uint32_t color32 = ((uint32_t)color.r << 16) | ((uint32_t)color.g << 8) |  //
+                       ((uint32_t)color.b << 0);
+    Surface_Cache fake_cache = {color32};
     if (!cz::binary_search(rend->caches.as_slice(), fake_cache, &index, compare_surface_cache)) {
         rend->caches.reserve(cz::heap_allocator(), 1);
         Surface_Cache cache = {};
-        cache.color = color;
+        cache.color = color32;
         rend->caches.insert(index, cache);
     }
 
@@ -123,8 +125,7 @@ static SDL_Surface* rasterize_code_point_cached(Render_State* rend,
         return cache->surfaces[index];  // Cache hit.
 
     // Cache miss.  Rasterize and add to the cache.
-    SDL_Color sdl_color = {(uint8_t)(color >> 16), (uint8_t)(color >> 8), (uint8_t)color};
-    SDL_Surface* surface = rasterize_code_point(seq, rend->font, 0, sdl_color);
+    SDL_Surface* surface = rasterize_code_point(seq, rend->font, 0, color);
     CZ_ASSERT(surface);
 
     cache->code_points.reserve(cz::heap_allocator(), 1);
@@ -143,8 +144,8 @@ bool render_code_point(Render_State* rend,
                        SDL_Surface* window_surface,
                        int64_t px,
                        int64_t py,
-                       uint32_t background,
-                       uint32_t foreground,
+                       SDL_Color background,
+                       SDL_Color foreground,
                        const char seq_in[5]) {
     ZoneScoped;
 
@@ -166,7 +167,8 @@ bool render_code_point(Render_State* rend,
     SDL_Surface* s = rasterize_code_point_cached(rend, seq, foreground);
 
     SDL_Rect rect = {(int)px, (int)py, rend->font_width, rend->font_height};
-    SDL_FillRect(window_surface, &rect, background);
+    uint32_t bg32 = SDL_MapRGB(window_surface->format, background.r, background.g, background.b);
+    SDL_FillRect(window_surface, &rect, bg32);
 
     SDL_Rect clip_character = {0, 0, rend->font_width, rend->font_height};
     SDL_BlitSurface(s, &clip_character, window_surface, &rect);

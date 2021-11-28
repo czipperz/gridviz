@@ -130,10 +130,8 @@ int actual_main(int argc, char** argv) {
                     int64_t x = event.cp.x * rend.font_width + rend.off_x;
                     int64_t y = event.cp.y * rend.font_height + rend.off_y;
 
-                    uint32_t bg =
-                        SDL_MapRGB(surface->format, event.cp.bg[0], event.cp.bg[1], event.cp.bg[2]);
-                    uint32_t fg = (((uint32_t)event.cp.fg[0] << 16) |
-                                   ((uint32_t)event.cp.fg[1] << 8) | ((uint32_t)event.cp.fg[2]));
+                    SDL_Color bg = {event.cp.bg[0], event.cp.bg[1], event.cp.bg[2]};
+                    SDL_Color fg = {event.cp.fg[0], event.cp.fg[1], event.cp.fg[2]};
 
                     char seq[5] = {(char)event.cp.ch};
                     (void)render_code_point(&rend, surface, x, y, bg, fg, seq);

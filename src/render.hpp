@@ -42,8 +42,8 @@ bool render_code_point(Render_State* rend,
                        SDL_Surface* window_surface,
                        int64_t px,
                        int64_t py,
-                       uint32_t background,
-                       uint32_t foreground,
+                       SDL_Color background,
+                       SDL_Color foreground,
                        const char seq_in[5]);
 
 }
