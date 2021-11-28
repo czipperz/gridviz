@@ -4,14 +4,13 @@
 #include <stdio.h>
 #include <Tracy.hpp>
 #include <cz/defer.hpp>
+#include <cz/heap.hpp>
 #include <cz/str.hpp>
 
 #include "gridviz.hpp"
 
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
+#include <shellscalingapi.h>
 #endif
 
 using namespace gridviz;
@@ -58,11 +57,11 @@ int actual_main(int argc, char** argv) {
 
     int font_height = TTF_FontLineSkip(font);
     int font_width = 10;
-    TTF_GlyphMetrics(rend.font, ' ', nullptr, nullptr, nullptr, nullptr, &font_width);
+    TTF_GlyphMetrics(font, ' ', nullptr, nullptr, nullptr, nullptr, &font_width);
 
-    SDL_Window* window =
-        SDL_CreateWindow("MYPROJECT", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                         800 * dpi_scale, 800 * dpi_scale, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+    SDL_Window* window = SDL_CreateWindow(
+        "MYPROJECT", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, (int)(800 * dpi_scale),
+        (int)(800 * dpi_scale), SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
     if (!window) {
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
         return 1;
@@ -74,28 +73,31 @@ int actual_main(int argc, char** argv) {
     // TODO remove dummy events
     events.reserve(cz::heap_allocator(), 3);
     {
+        uint8_t white[] = {0xff, 0xff, 0xff};
+        uint8_t black[] = {0x00, 0x00, 0x00};
+
         Event event = {};
         event.cp.type = EVENT_CHAR_POINT;
-        event.cp.fg = {0xff, 0xff, 0xff};
-        event.cp.bg = {0x00, 0x00, 0x00};
+        memcpy(event.cp.fg, white, sizeof(white));
+        memcpy(event.cp.bg, black, sizeof(black));
         event.cp.ch = 'A';
         event.cp.x = 0;
         event.cp.y = 0;
         events.push(event);
 
-        Event event = {};
+        event = {};
         event.cp.type = EVENT_CHAR_POINT;
-        event.cp.fg = {0xff, 0xff, 0xff};
-        event.cp.bg = {0x00, 0x00, 0x00};
+        memcpy(event.cp.fg, white, sizeof(white));
+        memcpy(event.cp.bg, black, sizeof(black));
         event.cp.ch = 'B';
         event.cp.x = 2;
         event.cp.y = 1;
         events.push(event);
 
-        Event event = {};
+        event = {};
         event.cp.type = EVENT_CHAR_POINT;
-        event.cp.fg = {0xff, 0xff, 0xff};
-        event.cp.bg = {0x00, 0x00, 0x00};
+        memcpy(event.cp.fg, white, sizeof(white));
+        memcpy(event.cp.bg, black, sizeof(black));
         event.cp.ch = 'C';
         event.cp.x = 0;
         event.cp.y = 4;
@@ -122,16 +124,24 @@ int actual_main(int argc, char** argv) {
         for (size_t i = 0; i < events.len; ++i) {
             Event& event = events[i];
             switch (event.type) {
-            case EVENT_CHAR_POINT:
-                CZ_PANIC("todo");
-                break;
+            case EVENT_CHAR_POINT: {
+                SDL_Rect rect = {
+                    event.cp.x * font_width,
+                    event.cp.y * font_height,
+                    font_width,
+                    font_height,
+                };
+                uint32_t bg = SDL_MapRGB(surface->format, event.bg[0], event.bg[1], event.bg[2]);
+                uint32_t fg = SDL_MapRGB(surface->format, event.fg[0], event.fg[1], event.fg[2]);
+                SDL_FillRect(surface, &rect, bg);
+            } break;
 
             case EVENT_KEY_FRAME:
                 CZ_PANIC("todo");
                 break;
 
             default:
-                CZ_DEBUG_ASSERT(false); // Ignore in release mode.
+                CZ_DEBUG_ASSERT(false);  // Ignore in release mode.
                 break;
             }
         }
