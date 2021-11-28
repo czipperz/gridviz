@@ -127,6 +127,7 @@ int actual_main(int argc, char** argv) {
             switch (event.type) {
             case SDL_QUIT:
                 return 0;
+
             case SDL_MOUSEMOTION:
                 // Dragging with left button.
                 if (event.motion.state & SDL_BUTTON_LMASK) {
@@ -134,6 +135,7 @@ int actual_main(int argc, char** argv) {
                     rend.off_y += event.motion.yrel;
                 }
                 break;
+
             case SDL_KEYDOWN:
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                     return 0;
