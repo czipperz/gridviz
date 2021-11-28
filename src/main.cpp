@@ -3,11 +3,14 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <Tracy.hpp>
+#include <cz/buffer_array.hpp>
 #include <cz/defer.hpp>
 #include <cz/heap.hpp>
 #include <cz/str.hpp>
 
+#include "global.hpp"
 #include "gridviz.hpp"
+#include "render.hpp"
 
 #ifdef _WIN32
 #include <shellscalingapi.h>
@@ -17,6 +20,20 @@ using namespace gridviz;
 
 int actual_main(int argc, char** argv) {
     ZoneScoped;
+
+    cz::Buffer_Array temp_arena;
+    temp_arena.init();
+    temp_allocator = temp_arena.allocator();
+
+    cz::Buffer_Array permanent_arena;
+    permanent_arena.init();
+    permanent_allocator = permanent_arena.allocator();
+
+    set_program_name(argv[0]);
+    set_program_directory();
+
+    Render_State rend = {};
+    rend.font_size = 14;
 
 #ifdef _WIN32
     SetProcessDpiAwareness(PROCESS_SYSTEM_DPI_AWARE);
@@ -28,12 +45,12 @@ int actual_main(int argc, char** argv) {
     }
     CZ_DEFER(SDL_Quit());
 
-    float dpi_scale = 1.0f;
+    rend.dpi_scale = 1.0f;
     {
         const float dpi_default = 96.0f;
         float dpi = 0;
         if (SDL_GetDisplayDPI(0, &dpi, NULL, NULL) == 0)
-            dpi_scale = dpi / dpi_default;
+            rend.dpi_scale = dpi / dpi_default;
     }
 
     if (TTF_Init() < 0) {
@@ -48,20 +65,19 @@ int actual_main(int argc, char** argv) {
     const char* font_path = "/usr/share/fonts/TTF/MesloLGMDZ-Regular.ttf";
 #endif
 
-    int font_size = 14;
-    TTF_Font* font = TTF_OpenFont(font_path, (int)(font_size * dpi_scale));
-    if (!font) {
+    rend.font = TTF_OpenFont(font_path, (int)(rend.font_size * rend.dpi_scale));
+    if (!rend.font) {
         fprintf(stderr, "TTF_OpenFont failed: %s\n", SDL_GetError());
         return 1;
     }
 
-    int font_height = TTF_FontLineSkip(font);
-    int font_width = 10;
-    TTF_GlyphMetrics(font, ' ', nullptr, nullptr, nullptr, nullptr, &font_width);
+    rend.font_height = TTF_FontLineSkip(rend.font);
+    rend.font_width = 10;
+    TTF_GlyphMetrics(rend.font, ' ', nullptr, nullptr, nullptr, nullptr, &rend.font_width);
 
     SDL_Window* window = SDL_CreateWindow(
-        "MYPROJECT", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, (int)(800 * dpi_scale),
-        (int)(800 * dpi_scale), SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+        "MYPROJECT", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, (int)(800 * rend.dpi_scale),
+        (int)(800 * rend.dpi_scale), SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
     if (!window) {
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
         return 1;
@@ -111,6 +127,13 @@ int actual_main(int argc, char** argv) {
             switch (event.type) {
             case SDL_QUIT:
                 return 0;
+            case SDL_MOUSEMOTION:
+                // Dragging with left button.
+                if (event.motion.state & SDL_BUTTON_LMASK) {
+                    rend.off_x -= event.motion.xrel;
+                    rend.off_y -= event.motion.yrel;
+                }
+                break;
             case SDL_KEYDOWN:
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                     return 0;
@@ -125,15 +148,17 @@ int actual_main(int argc, char** argv) {
             Event& event = events[i];
             switch (event.type) {
             case EVENT_CHAR_POINT: {
-                SDL_Rect rect = {
-                    event.cp.x * font_width,
-                    event.cp.y * font_height,
-                    font_width,
-                    font_height,
-                };
-                uint32_t bg = SDL_MapRGB(surface->format, event.bg[0], event.bg[1], event.bg[2]);
-                uint32_t fg = SDL_MapRGB(surface->format, event.fg[0], event.fg[1], event.fg[2]);
-                SDL_FillRect(surface, &rect, bg);
+                int64_t x = event.cp.x * rend.font_width + rend.off_x;
+                int64_t y = event.cp.y * rend.font_height + rend.off_y;
+
+                uint32_t bg =
+                    SDL_MapRGB(surface->format, event.cp.bg[0], event.cp.bg[1], event.cp.bg[2]);
+                uint32_t fg = (((uint32_t)event.cp.fg[0] << 16) | ((uint32_t)event.cp.fg[1] << 8) |
+                               ((uint32_t)event.cp.fg[2]));
+
+                char seq[5] = {(char)event.cp.ch};
+                (void)render_code_point(&rend, surface, event.cp.x * rend.font_width,
+                                        event.cp.y * rend.font_height, bg, fg, seq);
             } break;
 
             case EVENT_KEY_FRAME:
