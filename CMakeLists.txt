@@ -36,6 +36,13 @@ endif()
 file(GLOB_RECURSE SRCS src/*.cpp)
 add_library(${LIBRARY_NAME} ${SRCS})
 
+
+
+# Build netgridviz library.
+add_library(netgridviz netgridviz.c)
+
+
+
 # Run GNU Global if it is available.
 if (WIN32)
     add_custom_target(update_global
