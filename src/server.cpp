@@ -1,6 +1,10 @@
 #include "server.hpp"
 
+#include <cz/binary_search.hpp>
 #include <cz/heap.hpp>
+
+#define NETGRIDVIZ_DEFINE_PROTOCOL
+#include "../netgridviz.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // Xplat craziness
@@ -52,6 +56,8 @@ static int make_non_blocking(SOCKET socket);
 struct Network_State {
     bool running;
     cz::String buffer;
+
+    cz::Vector<netgridviz_context> contexts;
 
     SOCKET socket_server = INVALID_SOCKET;
     SOCKET socket_client = INVALID_SOCKET;
@@ -142,30 +148,89 @@ void stop_networking(Network_State* net) {
 // Module Code - cleanup
 ///////////////////////////////////////////////////////////////////////////////
 
+static size_t get_event_length(uint8_t type);
+static netgridviz_context* lookup_context(Network_State* net, uint16_t context_id);
+
 void poll_network(Network_State* net, cz::Vector<Event>* events) {
     actually_poll_server(net);
 
     while (1) {
-        if (net->buffer.len < sizeof(Event))
+        if (net->buffer.len == 0)
             break;
-        net->buffer.remove_range(0, sizeof(Event));
 
-        Event event;
-        memcpy(&event, net->buffer.buffer, sizeof(Event));
+        uint8_t type = 0;
+        memcpy(&type, net->buffer.buffer, 1);
 
-        events->reserve(cz::heap_allocator(), 1);
-        switch (event.type) {
-        case EVENT_CHAR_POINT:
+        size_t length = get_event_length(type);
+        if (net->buffer.len < length)
+            break;
+
+        uint16_t context_id = 0;
+        memcpy(&context_id, net->buffer.buffer + 1, 2);
+        netgridviz_context* context = lookup_context(net, context_id);
+
+        switch (type) {
+        case GRIDVIZ_SET_FG:
+            memcpy(&context->fg, net->buffer.buffer + 3, 3);
+            break;
+        case GRIDVIZ_SET_BG:
+            memcpy(&context->bg, net->buffer.buffer + 3, 3);
+            break;
+        case GRIDVIZ_SEND_CHAR: {
+            int64_t x = 0, y = 0;
+            char ch = 0;
+            memcpy(&x, net->buffer.buffer + 3, sizeof(x));
+            memcpy(&y, net->buffer.buffer + 11, sizeof(y));
+            memcpy(&ch, net->buffer.buffer + 19, sizeof(ch));
+
+            Event event = {};
+            event.cp.type = EVENT_CHAR_POINT;
+            memcpy(event.cp.fg, context->fg, sizeof(context->fg));
+            memcpy(event.cp.bg, context->bg, sizeof(context->bg));
+            event.cp.ch = ch;
+            event.cp.x = x;
+            event.cp.y = y;
+            events->reserve(cz::heap_allocator(), 1);
             events->push(event);
-            break;
-        case EVENT_KEY_FRAME:
-            CZ_PANIC("todo");
-            break;
+        } break;
         default:
             CZ_PANIC("invalid message type");
             break;
         }
+
+        net->buffer.remove_range(0, length);
     }
+}
+
+static size_t get_event_length(uint8_t type) {
+    switch (type) {
+    case GRIDVIZ_SET_FG:
+    case GRIDVIZ_SET_BG:
+        return 6;
+    case GRIDVIZ_SEND_CHAR:
+        return 20;
+    default:
+        CZ_PANIC("invalid message type");
+        break;
+    }
+}
+
+static int64_t compare_contexts(const netgridviz_context& left, const netgridviz_context& right) {
+    return (int64_t)left.id - (int64_t)right.id;
+}
+
+static netgridviz_context* lookup_context(Network_State* net, uint16_t context_id) {
+    // Use binary search because we want to handle crazy id number inputs without mallocing
+    // a rediculous amount of memory.  Performance of this function isn't that important.
+    size_t index;
+    netgridviz_context fake_context = {};
+    fake_context.id = context_id;
+    if (!cz::binary_search(net->contexts.as_slice(), fake_context, &index, compare_contexts)) {
+        net->contexts.reserve(cz::heap_allocator(), 1);
+        net->contexts.insert(index, netgridviz_make_context(context_id));
+    }
+
+    return &net->contexts[index];
 }
 
 static void actually_poll_server(Network_State* net) {

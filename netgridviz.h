@@ -1,6 +1,8 @@
 #ifndef NETGRIDVIZ_HEADER_GUARD
 #define NETGRIDVIZ_HEADER_GUARD
 
+#include <stdint.h>
+
 /// This is an all in one header file for netgridviz.
 ///
 /// To enable the implementation use: `#define NETGRIDVIZ_DEFINE`.
@@ -9,6 +11,14 @@
 // Header
 ///////////////////////////////////////////////////////////////////////////////
 
+typedef struct netgridviz_context {
+    uint16_t id;
+
+    // READ-ONLY!!! You must call the setters to access these variables!!!
+    uint8_t fg[3];
+    uint8_t bg[3];
+} netgridviz_context;
+
 #define NETGRIDVIZ_DEFAULT_PORT 41088
 
 /// Connect on the given port to the server.  Returns `0` on success, `-1` on failure.
@@ -16,9 +26,16 @@ int netgridviz_connect(int port);
 /// Disconnect from the server.
 void netgridviz_disconnect(void);
 
-/// Send data to the server.  Returns `len` on success, `-1`
-/// on failure, somewhere inbetween on partial transfer.
-int netgridviz_send(const void* buffer, size_t len);
+/// Make a new context.
+netgridviz_context netgridviz_create_context(void);
+netgridviz_context netgridviz_make_context(uint16_t id);
+
+/// Set colors.
+void netgridviz_set_fg(netgridviz_context* context, uint8_t r, uint8_t g, uint8_t b);
+void netgridviz_set_bg(netgridviz_context* context, uint8_t r, uint8_t g, uint8_t b);
+
+/// Send a charater.
+void netgridviz_send_char(netgridviz_context* context, int64_t x, int64_t y, char ch);
 
 #endif  // NETGRIDVIZ_HEADER_GUARD
 
@@ -26,7 +43,32 @@ int netgridviz_send(const void* buffer, size_t len);
 // Implementation
 ///////////////////////////////////////////////////////////////////////////////
 
+#if defined(NETGRIDVIZ_DEFINE) || defined(NETGRIDVIZ_DEFINE_PROTOCOL)
+#define GRIDVIZ_SET_FG 1
+#define GRIDVIZ_SET_BG 2
+#define GRIDVIZ_SEND_CHAR 3
+
+netgridviz_context netgridviz_make_context(uint16_t id) {
+    netgridviz_context context = {id};
+    // White foreground.
+    context.fg[0] = 0xff;
+    context.fg[1] = 0xff;
+    context.fg[2] = 0xff;
+    // Black foreground.
+    context.bg[1] = 0x00;
+    context.bg[0] = 0x00;
+    context.bg[2] = 0x00;
+    return context;
+}
+#endif
+
 #ifdef NETGRIDVIZ_DEFINE
+
+#include <stdio.h>  // print error on lose connection
+
+///////////////////////////////////////////////////////////////////////////////
+// Module Code - connection
+///////////////////////////////////////////////////////////////////////////////
 
 /////////////////////////////////////////////////
 // Xplat craziness
@@ -66,7 +108,7 @@ int netgridviz_send(const void* buffer, size_t len);
 // Module Data
 /////////////////////////////////////////////////
 
-static SOCKET netgridviz_socket;
+static SOCKET netgridviz_socket = INVALID_SOCKET;
 
 #ifdef _WIN32
 /// Winsock requires a global variable to store state.
@@ -192,15 +234,7 @@ static int netgridviz_connect_timeout(SOCKET sock,
 }
 
 /////////////////////////////////////////////////
-// Module Code - send
-/////////////////////////////////////////////////
-
-int netgridviz_send(const void* buffer, size_t len) {
-    return send(netgridviz_socket, (const char*)buffer, (len_t)len, 0);
-}
-
-/////////////////////////////////////////////////
-// Module Code - utility
+// Module Code - connect utility
 /////////////////////////////////////////////////
 
 static int netgridviz_winsock_start() {
@@ -231,6 +265,80 @@ static int netgridviz_make_non_blocking(SOCKET socket) {
         return flags;
     return fcntl(socket, F_SETFL, flags | O_NONBLOCK);
 #endif
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Module Code - contexts and messages
+///////////////////////////////////////////////////////////////////////////////
+
+static ssize_t netgridviz_send_raw(const void* buffer, size_t len) {
+    return send(netgridviz_socket, (const char*)buffer, (len_t)len, 0);
+}
+
+static void netgridviz_lose_connection(void) {
+    fprintf(stderr, "netgridviz: Connection to server lost\n");
+    netgridviz_disconnect();
+    netgridviz_socket = INVALID_SOCKET;
+}
+
+/////////////////////////////////////////////////
+// Context manipulation
+/////////////////////////////////////////////////
+
+static uint16_t netgridviz_context_counter;
+
+netgridviz_context netgridviz_create_context(void) {
+    netgridviz_context_counter++;
+    return netgridviz_make_context(netgridviz_context_counter);
+}
+
+void netgridviz_set_fg(netgridviz_context* context, uint8_t r, uint8_t g, uint8_t b) {
+    if (netgridviz_socket == INVALID_SOCKET)
+        return;
+
+    context->fg[0] = r;
+    context->fg[1] = g;
+    context->fg[2] = b;
+
+    uint8_t message[6] = {GRIDVIZ_SET_FG};
+    memcpy(message + 1, &context->id, sizeof(context->id));
+    memcpy(message + 3, &context->fg[0], sizeof(context->fg));
+
+    ssize_t sent = netgridviz_send_raw(&message[0], sizeof(message));
+    if (sent != sizeof(message))
+        netgridviz_lose_connection();
+}
+
+void netgridviz_set_bg(netgridviz_context* context, uint8_t r, uint8_t g, uint8_t b) {
+    if (netgridviz_socket == INVALID_SOCKET)
+        return;
+
+    context->bg[0] = r;
+    context->bg[1] = g;
+    context->bg[2] = b;
+
+    uint8_t message[6] = {GRIDVIZ_SET_BG};
+    memcpy(message + 1, &context->id, sizeof(context->id));
+    memcpy(message + 3, &context->bg[0], sizeof(context->bg));
+
+    ssize_t sent = netgridviz_send_raw(&message[0], sizeof(message));
+    if (sent != sizeof(message))
+        netgridviz_lose_connection();
+}
+
+void netgridviz_send_char(netgridviz_context* context, int64_t x, int64_t y, char ch) {
+    if (netgridviz_socket == INVALID_SOCKET)
+        return;
+
+    uint8_t message[20] = {GRIDVIZ_SEND_CHAR};
+    memcpy(message + 1, &context->id, sizeof(context->id));
+    memcpy(message + 3, &x, sizeof(x));
+    memcpy(message + 11, &y, sizeof(y));
+    memcpy(message + 19, &ch, sizeof(ch));
+
+    ssize_t sent = netgridviz_send_raw(&message[0], sizeof(message));
+    if (sent != sizeof(message))
+        netgridviz_lose_connection();
 }
 
 #endif  // NETGRIDVIZ_DEFINE
