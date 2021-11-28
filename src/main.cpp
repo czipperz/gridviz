@@ -37,6 +37,7 @@ int actual_main(int argc, char** argv) {
     Network_State* net = nullptr;
 
     rend.font_size = 14;
+    int port = 41088;
 
 #ifdef _WIN32
     SetProcessDpiAwareness(PROCESS_SYSTEM_DPI_AWARE);
@@ -88,7 +89,7 @@ int actual_main(int argc, char** argv) {
     CZ_DEFER(SDL_DestroyWindow(window));
 
     cz::Vector<Event> events = {};
-    net = start_networking();
+    net = start_networking(port);
 
     while (1) {
         uint32_t start_frame = SDL_GetTicks();

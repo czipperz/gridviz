@@ -8,7 +8,7 @@ namespace gridviz {
 
 struct Network_State;
 
-Network_State* start_networking();
+Network_State* start_networking(int port);
 void poll_network(Network_State* net, cz::Vector<Event>* events);
 void stop_networking(Network_State* net);
 
