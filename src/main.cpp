@@ -245,8 +245,8 @@ int actual_main(int argc, char** argv) {
                 for (size_t i = 0; i < the_run->strokes.len + 1; ++i) {
                     SDL_Rect line_rect = {(int)x, slider_rect.y, 1, slider_rect.h};
                     if (i == the_run->selected_stroke) {
-                        line_rect.w = 3;
-                        line_rect.x -= 1;
+                        line_rect.w = 7;
+                        line_rect.x -= 3;
                         SDL_FillRect(surface, &line_rect, selected_color);
                     } else {
                         SDL_FillRect(surface, &line_rect, normal_color);
