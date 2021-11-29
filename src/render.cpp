@@ -52,7 +52,7 @@ void set_icon(SDL_Window* sdl_window) {
 // Font manipulation
 ///////////////////////////////////////////////////////////////////////////////
 
-static void close_font(Render_State* rend) {
+void close_font(Render_State* rend) {
     ZoneScoped;
 
     // Destroy existing caches.

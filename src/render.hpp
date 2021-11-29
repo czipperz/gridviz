@@ -35,6 +35,7 @@ struct Render_State {
 void set_icon(SDL_Window* sdl_window);
 
 bool open_font(Render_State* rend, const char* path, int font_size);
+void close_font(Render_State* rend);
 
 bool render_code_point(Render_State* rend,
                        SDL_Surface* window_surface,

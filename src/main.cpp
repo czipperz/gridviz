@@ -77,6 +77,7 @@ int actual_main(int argc, char** argv) {
         fprintf(stderr, "TTF_OpenFont failed: %s\n", SDL_GetError());
         return 1;
     }
+    CZ_DEFER(close_font(&rend));
 
     rend.font_height = TTF_FontLineSkip(rend.font);
     rend.font_width = 10;
