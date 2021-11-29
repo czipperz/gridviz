@@ -194,12 +194,6 @@ int actual_main(int argc, char** argv) {
         SDL_Surface* surface = SDL_GetWindowSurface(window);
         SDL_FillRect(surface, NULL, SDL_MapRGB(surface->format, 0xff, 0xff, 0xff));
 
-        Size_Cache* menu_font = open_font(&rend, font_path, (int)(menu_font_size * dpi_scale));
-        if (!menu_font) {
-            fprintf(stderr, "TTF_OpenFont failed: %s\n", SDL_GetError());
-            return 1;
-        }
-
         int timeline_width = get_timeline_width(surface->w);
 
         /////////////////////////////////////////
@@ -254,6 +248,12 @@ int actual_main(int argc, char** argv) {
             const SDL_Color horline_color = {0x44, 0x44, 0x44};
             const int padding = 8;
 
+            Size_Cache* menu_font = open_font(&rend, font_path, (int)(menu_font_size * dpi_scale));
+            if (!menu_font) {
+                fprintf(stderr, "TTF_OpenFont failed: %s\n", SDL_GetError());
+                return 1;
+            }
+
             SDL_Rect bar_rect = {0, 0, timeline_width, surface->h};
             SDL_SetClipRect(surface, &bar_rect);
 
@@ -297,6 +297,58 @@ int actual_main(int argc, char** argv) {
                     SDL_MapRGB(surface->format, horline_color.r, horline_color.g, horline_color.b));
                 text_rect_start.y += 1;  // account for horline
                 text_rect_start.y += 2;  // add some padding
+            }
+        }
+
+        /////////////////////////////////////////
+        // Waiting for connection screen
+        /////////////////////////////////////////
+        if (!the_run) {
+            const SDL_Color bg = {0xdd, 0xdd, 0xdd};
+            const SDL_Color fg = {0x00, 0x00, 0x00};
+
+            Size_Cache* menu_font = open_font(&rend, font_path, (int)(menu_font_size * dpi_scale));
+            if (!menu_font) {
+                fprintf(stderr, "TTF_OpenFont failed: %s\n", SDL_GetError());
+                return 1;
+            }
+
+            cz::Str message1 = "WAITING FOR CONNECTION";
+            cz::Str message2 = "...";
+
+            // Draw bounding box.
+            {
+                int padding = 10;
+                SDL_Rect rect = {
+                    (surface->w - menu_font->font_width * (int)message1.len) / 2 - padding,
+                    (surface->h - menu_font->font_height * 2) / 2 - padding,
+                    menu_font->font_width * (int)message1.len + padding * 2,
+                    menu_font->font_height * 2 + padding * 2,
+                };
+                SDL_FillRect(surface, &rect, SDL_MapRGB(surface->format, bg.r, bg.g, bg.b));
+            }
+
+            // Draw message1.
+            {
+                int64_t x = (surface->w - menu_font->font_width * message1.len) / 2;
+                int64_t y = surface->h / 2 - menu_font->font_height;
+                for (size_t i = 0; i < message1.len; ++i) {
+                    char seq[5] = {(char)message1[i]};
+                    (void)render_code_point(menu_font, surface, x, y, bg, fg, seq);
+                    x += menu_font->font_width;
+                }
+            }
+
+            // Draw message2.
+            {
+                int64_t x = (surface->w - menu_font->font_width * message2.len) / 2;
+                int64_t y = surface->h / 2;
+                int numticks = (SDL_GetTicks() % 2000 / 666 + 1);
+                for (size_t i = 0; i < numticks; ++i) {
+                    char seq[5] = {(char)message2[i]};
+                    (void)render_code_point(menu_font, surface, x, y, bg, fg, seq);
+                    x += menu_font->font_width;
+                }
             }
         }
 
