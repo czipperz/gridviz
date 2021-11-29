@@ -90,6 +90,7 @@ int actual_main(int argc, char** argv) {
 
     cz::Vector<Event> events = {};
     net = start_networking(port);
+    size_t selected_event = events.len;
 
     while (1) {
         uint32_t start_frame = SDL_GetTicks();
@@ -110,11 +111,22 @@ int actual_main(int argc, char** argv) {
             case SDL_KEYDOWN:
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                     return 0;
+                if (event.key.keysym.sym == SDLK_LEFT) {
+                    if (selected_event > 0)
+                        selected_event--;
+                }
+                if (event.key.keysym.sym == SDLK_RIGHT) {
+                    if (selected_event < events.len)
+                        selected_event++;
+                }
                 break;
             }
         }
 
+        bool advance = (selected_event == events.len);
         poll_network(net, &events);
+        if (advance)
+            selected_event = events.len;
 
         SDL_Surface* surface = SDL_GetWindowSurface(window);
         SDL_FillRect(surface, NULL, SDL_MapRGB(surface->format, 0xff, 0xff, 0xff));
@@ -128,7 +140,7 @@ int actual_main(int argc, char** argv) {
             SDL_Rect plane_rect = {0, 0, surface->w, surface->h - bottom_height};
             SDL_SetClipRect(surface, &plane_rect);
 
-            for (size_t i = 0; i < events.len; ++i) {
+            for (size_t i = 0; i < selected_event; ++i) {
                 Event& event = events[i];
                 switch (event.type) {
                 case EVENT_CHAR_POINT: {
