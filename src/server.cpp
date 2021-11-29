@@ -316,6 +316,8 @@ static void actually_poll_server(Network_State* net, Game_State* game) {
         // TODO pull out graphical stuff
         the_run.selected_stroke = 1;
         the_run.font_size = 14;
+        the_run.off_x = 10;
+        the_run.off_y = 10;
         std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
         time_t time = std::chrono::system_clock::to_time_t(now);
         the_run.start_time = cz::time_t_to_date_local(time);
