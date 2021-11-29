@@ -34,11 +34,26 @@ static void render_timeline_line(Size_Cache* font,
                                  SDL_Point* text_rect_end,
                                  SDL_Color bg,
                                  SDL_Color fg,
-                                 cz::Str message) {
+                                 cz::Str message,
+                                 int mode) {
     int x = text_rect_start->x;
     int y = text_rect_start->y;
     int numchars = cz::max(1, (text_rect_end->x - text_rect_start->x) / font->font_width);
     int width = numchars * font->font_width;
+    if (mode >= 0) {
+        cz::Str prefix = (mode <= 1 ? "+ " : "  ");
+        for (size_t i = 0; i < prefix.len; ++i) {
+            if (x == width) {
+                x = 0;
+                y += font->font_height;
+                text_rect_start->y = y;
+            }
+
+            char seq[5] = {(char)prefix[i]};
+            (void)render_code_point(font, surface, x, y, bg, fg, seq);
+            x += font->font_width;
+        }
+    }
     for (size_t i = 0; i < message.len; ++i) {
         if (x == width) {
             x = 0;
@@ -381,7 +396,7 @@ int actual_main(int argc, char** argv) {
 
             // Draw title.
             render_timeline_line(menu_font, surface, &text_rect_start, &text_rect_end, bg,
-                                 fg_applied, "Time line:");
+                                 fg_applied, "Time line:", /*mode=*/-1);
 
             // Draw horizontal divider after the title.
             text_rect_start.y += 4;  // add some padding
@@ -396,17 +411,20 @@ int actual_main(int argc, char** argv) {
             for (size_t i = 0; i < the_run->strokes.len; ++i) {
                 Stroke* stroke = &the_run->strokes[i];
                 SDL_Color fg = fg_ignored;
+                int mode = 2;
                 if (i == the_run->selected_stroke ||
                     (i == the_run->selected_stroke - 1 && i == the_run->strokes.len - 1)) {
                     fg = fg_selected;
+                    mode = 1;
                 } else if (i < the_run->selected_stroke) {
                     fg = fg_applied;
+                    mode = 0;
                 }
                 SDL_Rect stroke_rect = {text_rect_start.x, text_rect_start.y - 2,
                                         bar_rect.w - padding * 2, 0};
 
                 render_timeline_line(menu_font, surface, &text_rect_start, &text_rect_end, bg, fg,
-                                     stroke->title);
+                                     stroke->title, mode);
 
                 stroke_rect.h = text_rect_start.y - stroke_rect.y + 2 * 2;
                 the_stroke_rects.reserve(cz::heap_allocator(), 1);
