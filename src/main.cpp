@@ -361,7 +361,7 @@ int actual_main(int argc, char** argv) {
             {
                 int64_t x = (surface->w - menu_font->font_width * message2.len) / 2;
                 int64_t y = surface->h / 2;
-                int numticks = (SDL_GetTicks() % 2000 / 666 + 1);
+                int numticks = (SDL_GetTicks() % 2000 / 667 + 1);
                 for (size_t i = 0; i < numticks; ++i) {
                     char seq[5] = {(char)message2[i]};
                     (void)render_code_point(menu_font, surface, x, y, bg, fg, seq);
