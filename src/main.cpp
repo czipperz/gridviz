@@ -182,8 +182,8 @@ int actual_main(int argc, char** argv) {
                     Event& event = stroke->events[i];
                     switch (event.type) {
                     case EVENT_CHAR_POINT: {
-                        int64_t x = event.cp.x * rend.font_width + rend.off_x;
-                        int64_t y = event.cp.y * rend.font_height + rend.off_y;
+                        int64_t x = event.cp.x * rend.font_width + the_run->off_x;
+                        int64_t y = event.cp.y * rend.font_height + the_run->off_y;
 
                         SDL_Color bg = {event.cp.bg[0], event.cp.bg[1], event.cp.bg[2]};
                         SDL_Color fg = {event.cp.fg[0], event.cp.fg[1], event.cp.fg[2]};

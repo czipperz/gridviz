@@ -24,8 +24,6 @@ struct Render_State {
     TTF_Font* font;
     int font_size;
     cz::Vector<Surface_Cache> caches;
-    int64_t off_x;
-    int64_t off_y;
 
     void drop();
 };
