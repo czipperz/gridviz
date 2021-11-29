@@ -356,6 +356,9 @@ int actual_main(int argc, char** argv) {
             // Gray background.
             SDL_FillRect(surface, &bar_rect, SDL_MapRGB(surface->format, bg.r, bg.g, bg.b));
 
+            SDL_Rect rightbar = {bar_rect.w - 1, bar_rect.y, 1, bar_rect.h};
+            SDL_FillRect(surface, &rightbar, SDL_MapRGB(surface->format, 0x00, 0x00, 0x00));
+
             SDL_Point text_rect_start = {bar_rect.x + padding, bar_rect.y + padding};
             SDL_Point text_rect_end = {bar_rect.w - padding, bar_rect.h - padding};
 
