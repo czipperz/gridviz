@@ -90,9 +90,12 @@ int actual_main(int argc, char** argv) {
     }
     CZ_DEFER(SDL_DestroyWindow(window));
 
-    cz::Vector<Event> events = {};
     net = start_networking(port);
-    size_t selected_event = events.len;
+
+    cz::Vector<Stroke> strokes = {};
+    strokes.reserve(cz::heap_allocator(), 4);
+    strokes.push({"Stroke 0"});
+    size_t selected_stroke = strokes.len;
 
     bool dragging = false;
 
@@ -117,8 +120,8 @@ int actual_main(int argc, char** argv) {
                                                 30};
                         SDL_Point point = {event.button.x, event.button.y};
                         if (SDL_PointInRect(&point, &slider_rect)) {
-                            double event_width = (double)slider_rect.w / (double)events.len;
-                            selected_event =
+                            double event_width = (double)slider_rect.w / (double)strokes.len;
+                            selected_stroke =
                                 (size_t)((point.x - slider_rect.x) / event_width + 0.5);
                         }
                     }
@@ -143,21 +146,21 @@ int actual_main(int argc, char** argv) {
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                     return 0;
                 if (event.key.keysym.sym == SDLK_LEFT) {
-                    if (selected_event > 0)
-                        selected_event--;
+                    if (selected_stroke > 0)
+                        selected_stroke--;
                 }
                 if (event.key.keysym.sym == SDLK_RIGHT) {
-                    if (selected_event < events.len)
-                        selected_event++;
+                    if (selected_stroke < strokes.len)
+                        selected_stroke++;
                 }
                 break;
             }
         }
 
-        bool advance = (selected_event == events.len);
-        poll_network(net, &events);
+        bool advance = (selected_stroke == strokes.len);
+        poll_network(net, &strokes);
         if (advance)
-            selected_event = events.len;
+            selected_stroke = strokes.len;
 
         SDL_Surface* surface = SDL_GetWindowSurface(window);
         SDL_FillRect(surface, NULL, SDL_MapRGB(surface->format, 0xff, 0xff, 0xff));
@@ -169,27 +172,30 @@ int actual_main(int argc, char** argv) {
             SDL_Rect plane_rect = {0, 0, surface->w, surface->h - bottom_height};
             SDL_SetClipRect(surface, &plane_rect);
 
-            for (size_t i = 0; i < selected_event; ++i) {
-                Event& event = events[i];
-                switch (event.type) {
-                case EVENT_CHAR_POINT: {
-                    int64_t x = event.cp.x * rend.font_width + rend.off_x;
-                    int64_t y = event.cp.y * rend.font_height + rend.off_y;
+            for (size_t s = 0; s < selected_stroke; ++s) {
+                Stroke* stroke = &strokes[s];
+                for (size_t i = 0; i < stroke->events.len; ++i) {
+                    Event& event = stroke->events[i];
+                    switch (event.type) {
+                    case EVENT_CHAR_POINT: {
+                        int64_t x = event.cp.x * rend.font_width + rend.off_x;
+                        int64_t y = event.cp.y * rend.font_height + rend.off_y;
 
-                    SDL_Color bg = {event.cp.bg[0], event.cp.bg[1], event.cp.bg[2]};
-                    SDL_Color fg = {event.cp.fg[0], event.cp.fg[1], event.cp.fg[2]};
+                        SDL_Color bg = {event.cp.bg[0], event.cp.bg[1], event.cp.bg[2]};
+                        SDL_Color fg = {event.cp.fg[0], event.cp.fg[1], event.cp.fg[2]};
 
-                    char seq[5] = {(char)event.cp.ch};
-                    (void)render_code_point(&rend, surface, x, y, bg, fg, seq);
-                } break;
+                        char seq[5] = {(char)event.cp.ch};
+                        (void)render_code_point(&rend, surface, x, y, bg, fg, seq);
+                    } break;
 
-                case EVENT_KEY_FRAME:
-                    CZ_PANIC("todo");
-                    break;
+                    case EVENT_KEY_FRAME:
+                        CZ_PANIC("todo");
+                        break;
 
-                default:
-                    CZ_DEBUG_ASSERT(false);  // Ignore in release mode.
-                    break;
+                    default:
+                        CZ_DEBUG_ASSERT(false);  // Ignore in release mode.
+                        break;
+                    }
                 }
             }
         }
@@ -227,11 +233,11 @@ int actual_main(int argc, char** argv) {
             {
                 uint32_t normal_color = SDL_MapRGB(surface->format, 0x00, 0x00, 0x00);
                 uint32_t selected_color = SDL_MapRGB(surface->format, 0xff, 0x00, 0x00);
-                double event_width = (double)slider_rect.w / (double)events.len;
+                double event_width = (double)slider_rect.w / (double)strokes.len;
                 double x = slider_rect.x;
-                for (size_t i = 0; i < events.len + 1; ++i) {
+                for (size_t i = 0; i < strokes.len + 1; ++i) {
                     SDL_Rect line_rect = {x, slider_rect.y, 1, slider_rect.h};
-                    if (i == selected_event) {
+                    if (i == selected_stroke) {
                         line_rect.w = 3;
                         line_rect.x -= 1;
                         SDL_FillRect(surface, &line_rect, selected_color);

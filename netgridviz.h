@@ -11,6 +11,10 @@
 // Header
 ///////////////////////////////////////////////////////////////////////////////
 
+/////////////////////////////////////////////////
+// Type Definitions
+/////////////////////////////////////////////////
+
 typedef struct netgridviz_context {
     uint16_t id;
 
@@ -21,12 +25,20 @@ typedef struct netgridviz_context {
 
 #define NETGRIDVIZ_DEFAULT_PORT 41088
 
+/////////////////////////////////////////////////
+// Connection
+/////////////////////////////////////////////////
+
 /// Connect on the given port to the server.  Returns `0` on success, `-1` on failure.
 int netgridviz_connect(int port);
 /// Disconnect from the server.
 void netgridviz_disconnect(void);
 
-/// Make a new context.
+/////////////////////////////////////////////////
+// Context
+/////////////////////////////////////////////////
+
+/// Create a new context.  You can have multiple contexts and .
 netgridviz_context netgridviz_create_context(void);
 netgridviz_context netgridviz_make_context(uint16_t id);
 
@@ -34,8 +46,33 @@ netgridviz_context netgridviz_make_context(uint16_t id);
 void netgridviz_set_fg(netgridviz_context* context, uint8_t r, uint8_t g, uint8_t b);
 void netgridviz_set_bg(netgridviz_context* context, uint8_t r, uint8_t g, uint8_t b);
 
-/// Send a charater.
-void netgridviz_send_char(netgridviz_context* context, int64_t x, int64_t y, char ch);
+/////////////////////////////////////////////////
+// Draw Commands
+/////////////////////////////////////////////////
+
+/// Draw commands are issued as part of the current stroke.
+/// If there is no stroke then creates a new stroke just for this command.
+
+/// Start a stroke (a series of draw commands that are one "undo/redo"
+/// unit).  Title is optional (null or empty string will count as no input).
+void netgridviz_start_stroke(const char* title);
+void netgridviz_end_stroke(void);
+
+/// Draw a character.
+void netgridviz_draw_char(netgridviz_context* context, int64_t x, int64_t y, char ch);
+
+/// Draw a string.
+void netgridviz_draw_string(netgridviz_context* context, int64_t x, int64_t y, const char* string);
+void netgridviz_draw_fmt(netgridviz_context* context,
+                         int64_t x,
+                         int64_t y,
+                         const char* format,
+                         ...);
+void netgridviz_draw_vfmt(netgridviz_context* context,
+                          int64_t x,
+                          int64_t y,
+                          const char* format,
+                          va_list args);
 
 #endif  // NETGRIDVIZ_HEADER_GUARD
 
@@ -46,7 +83,8 @@ void netgridviz_send_char(netgridviz_context* context, int64_t x, int64_t y, cha
 #if defined(NETGRIDVIZ_DEFINE) || defined(NETGRIDVIZ_DEFINE_PROTOCOL)
 #define GRIDVIZ_SET_FG 1
 #define GRIDVIZ_SET_BG 2
-#define GRIDVIZ_SEND_CHAR 3
+#define GRIDVIZ_START_STROKE 3
+#define GRIDVIZ_SEND_CHAR 4
 
 netgridviz_context netgridviz_make_context(uint16_t id) {
     netgridviz_context context = {id};
@@ -64,7 +102,9 @@ netgridviz_context netgridviz_make_context(uint16_t id) {
 
 #ifdef NETGRIDVIZ_DEFINE
 
-#include <stdio.h>  // print error on lose connection
+#include <stdio.h>   // print error on lose connection
+#include <stdlib.h>  // malloc
+#include <string.h>  // strlen
 
 ///////////////////////////////////////////////////////////////////////////////
 // Module Code - connection
@@ -268,7 +308,7 @@ static int netgridviz_make_non_blocking(SOCKET socket) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Module Code - contexts and messages
+// Module Code - Utility
 ///////////////////////////////////////////////////////////////////////////////
 
 static ssize_t netgridviz_send_raw(const void* buffer, size_t len) {
@@ -282,7 +322,7 @@ static void netgridviz_lose_connection(void) {
 }
 
 /////////////////////////////////////////////////
-// Context manipulation
+// Module Code - Context
 /////////////////////////////////////////////////
 
 static uint16_t netgridviz_context_counter;
@@ -326,9 +366,57 @@ void netgridviz_set_bg(netgridviz_context* context, uint8_t r, uint8_t g, uint8_
         netgridviz_lose_connection();
 }
 
-void netgridviz_send_char(netgridviz_context* context, int64_t x, int64_t y, char ch) {
+/////////////////////////////////////////////////
+// Module Code - Draw Commands
+/////////////////////////////////////////////////
+
+/// Note: using `uint8_t` instead of `bool` so C compliant.
+static uint8_t netgridviz_has_stroke;
+
+void netgridviz_start_stroke(const char* title) {
+    netgridviz_has_stroke = 1;
+
+    if (!title)
+        title = "";
+
+    // Truncate message to `UINT32_MAX`.
+    size_t len_s = strlen(title);
+    uint32_t len = ((uint64_t)len_s > (uint64_t)UINT32_MAX ? UINT32_MAX : (uint32_t)len_s);
+
+    uint8_t message[5] = {GRIDVIZ_START_STROKE};
+    memcpy(message + 1, &len, sizeof(len));
+
+    ssize_t sent = netgridviz_send_raw(&message[0], sizeof(message));
+    if (sent != sizeof(message)) {
+        netgridviz_lose_connection();
+        return;
+    }
+
+    // Send the title.
+    if (len > 0) {
+        ssize_t sent = netgridviz_send_raw(&title[0], len);
+        if (sent != len)
+            netgridviz_lose_connection();
+    }
+}
+
+void netgridviz_end_stroke() {
+    netgridviz_has_stroke = 0;
+}
+
+static void netgridviz_start_dummy_stroke(void) {
+    uint8_t message[5] = {GRIDVIZ_START_STROKE};
+    ssize_t sent = netgridviz_send_raw(&message[0], sizeof(message));
+    if (sent != sizeof(message))
+        netgridviz_lose_connection();
+}
+
+void netgridviz_draw_char(netgridviz_context* context, int64_t x, int64_t y, char ch) {
     if (netgridviz_socket == INVALID_SOCKET)
         return;
+
+    if (!netgridviz_has_stroke)
+        netgridviz_start_dummy_stroke();
 
     uint8_t message[20] = {GRIDVIZ_SEND_CHAR};
     memcpy(message + 1, &context->id, sizeof(context->id));
@@ -339,6 +427,63 @@ void netgridviz_send_char(netgridviz_context* context, int64_t x, int64_t y, cha
     ssize_t sent = netgridviz_send_raw(&message[0], sizeof(message));
     if (sent != sizeof(message))
         netgridviz_lose_connection();
+}
+
+void netgridviz_draw_string(netgridviz_context* context, int64_t x, int64_t y, const char* string) {
+    uint8_t has_stroke = netgridviz_has_stroke;
+    if (!has_stroke) {
+        netgridviz_start_dummy_stroke();
+        netgridviz_has_stroke = 1;
+    }
+
+    for (size_t i = 0; string[i] != '\0'; ++i) {
+        netgridviz_draw_char(context, x, y, string[i]);
+    }
+
+    netgridviz_has_stroke = has_stroke;
+}
+
+void netgridviz_draw_fmt(netgridviz_context* context,
+                         int64_t x,
+                         int64_t y,
+                         const char* format,
+                         ...) {
+    va_list args;
+    va_start(args, format);
+    netgridviz_draw_vfmt(context, x, y, format, args);
+    va_end(args);
+}
+
+void netgridviz_draw_vfmt(netgridviz_context* context,
+                          int64_t x,
+                          int64_t y,
+                          const char* format,
+                          va_list args) {
+    va_list args2;
+    va_copy(args2, args);
+    int result = snprintf(NULL, 0, format, args2);
+    va_end(args2);
+
+    if (result < 0)
+        return;
+
+    // Most of the time the message will fit in a 4k stack buffer.
+    // If it doesn't then try to heap allocate a big enough buffer.
+    // If heap allocation fails then fallback to the 4k stack buffer
+    //     and truncate the result.
+    if (result + 1 > 4096) {
+        char* heap_buffer = (char*)malloc(result + 1);
+        if (heap_buffer) {
+            snprintf(heap_buffer, result + 1, format, args);
+            netgridviz_draw_string(context, x, y, heap_buffer);
+            free(heap_buffer);
+            return;
+        }
+    }
+
+    char stack_buffer[4096];
+    snprintf(stack_buffer, sizeof(stack_buffer), format, args);
+    netgridviz_draw_string(context, x, y, stack_buffer);
 }
 
 #endif  // NETGRIDVIZ_DEFINE

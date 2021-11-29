@@ -26,4 +26,9 @@ union Event {
     } kf;
 };
 
+struct Stroke {
+    cz::Str title;
+    cz::Vector<Event> events;
+};
+
 }

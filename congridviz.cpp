@@ -19,8 +19,8 @@ int main() {
 
     netgridviz_set_fg(&c1, 0xff, 0, 0);
 
-    netgridviz_send_char(&c1, /*x=*/dist(rd), /*y=*/dist(rd), '#');
-    netgridviz_send_char(&c2, /*x=*/dist(rd), /*y=*/dist(rd), 'X');
+    netgridviz_draw_char(&c1, /*x=*/dist(rd), /*y=*/dist(rd), '#');
+    netgridviz_draw_char(&c2, /*x=*/dist(rd), /*y=*/dist(rd), 'X');
 
     netgridviz_disconnect();
 }

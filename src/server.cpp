@@ -1,7 +1,10 @@
 #include "server.hpp"
 
 #include <cz/binary_search.hpp>
+#include <cz/format.hpp>
 #include <cz/heap.hpp>
+
+#include <stdio.h>
 
 #define NETGRIDVIZ_DEFINE_PROTOCOL
 #include "../netgridviz.h"
@@ -58,6 +61,7 @@ struct Network_State {
     cz::String buffer;
 
     cz::Vector<netgridviz_context> contexts;
+    bool reuse_first_stroke;
 
     SOCKET socket_server = INVALID_SOCKET;
     SOCKET socket_client = INVALID_SOCKET;
@@ -148,10 +152,10 @@ void stop_networking(Network_State* net) {
 // Module Code - cleanup
 ///////////////////////////////////////////////////////////////////////////////
 
-static size_t get_event_length(uint8_t type);
+static size_t get_event_length(uint8_t type, cz::Str buffer);
 static netgridviz_context* lookup_context(Network_State* net, uint16_t context_id);
 
-void poll_network(Network_State* net, cz::Vector<Event>* events) {
+void poll_network(Network_State* net, cz::Vector<Stroke>* strokes) {
     actually_poll_server(net);
 
     while (1) {
@@ -161,7 +165,7 @@ void poll_network(Network_State* net, cz::Vector<Event>* events) {
         uint8_t type = 0;
         memcpy(&type, net->buffer.buffer, 1);
 
-        size_t length = get_event_length(type);
+        size_t length = get_event_length(type, net->buffer);
         if (net->buffer.len < length)
             break;
 
@@ -176,7 +180,29 @@ void poll_network(Network_State* net, cz::Vector<Event>* events) {
         case GRIDVIZ_SET_BG:
             memcpy(&context->bg, net->buffer.buffer + 3, 3);
             break;
+
+        case GRIDVIZ_START_STROKE: {
+            printf("start stroke\n");
+            if (net->reuse_first_stroke) {
+                net->reuse_first_stroke = false;
+            } else {
+                strokes->reserve(cz::heap_allocator(), 1);
+                strokes->push({});
+            }
+
+            cz::Str title;
+            if (length == 5) {
+                title = cz::format(cz::heap_allocator(), "Stroke ", strokes->len - 1);
+            } else {
+                title = net->buffer.slice(5, length).clone(cz::heap_allocator());
+            }
+            strokes->last().title = title;
+        } break;
+
         case GRIDVIZ_SEND_CHAR: {
+            printf("send char\n");
+            net->reuse_first_stroke = false;
+
             int64_t x = 0, y = 0;
             char ch = 0;
             memcpy(&x, net->buffer.buffer + 3, sizeof(x));
@@ -190,9 +216,12 @@ void poll_network(Network_State* net, cz::Vector<Event>* events) {
             event.cp.ch = ch;
             event.cp.x = x;
             event.cp.y = y;
-            events->reserve(cz::heap_allocator(), 1);
-            events->push(event);
+
+            Stroke* stroke = &strokes->last();
+            stroke->events.reserve(cz::heap_allocator(), 1);
+            stroke->events.push(event);
         } break;
+
         default:
             CZ_PANIC("invalid message type");
             break;
@@ -202,11 +231,18 @@ void poll_network(Network_State* net, cz::Vector<Event>* events) {
     }
 }
 
-static size_t get_event_length(uint8_t type) {
+static size_t get_event_length(uint8_t type, cz::Str buffer) {
     switch (type) {
     case GRIDVIZ_SET_FG:
     case GRIDVIZ_SET_BG:
         return 6;
+    case GRIDVIZ_START_STROKE: {
+        if (buffer.len < 5)
+            return 5;
+        uint32_t title_len;
+        memcpy(&title_len, buffer.buffer + 1, sizeof(title_len));
+        return 5 + (size_t)title_len;
+    }
     case GRIDVIZ_SEND_CHAR:
         return 20;
     default:
@@ -264,6 +300,8 @@ static void actually_poll_server(Network_State* net) {
         }
 
         net->socket_client = client;
+        net->contexts.len = 0;
+        net->reuse_first_stroke = true;
     }
 }
 
