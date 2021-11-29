@@ -69,6 +69,7 @@ int actual_main(int argc, char** argv) {
     Game_State game = {};
 
     int menu_font_size = 14;
+    int wfc_font_size = 20;
     int port = 41088;
 
 #ifdef _WIN32
@@ -307,7 +308,7 @@ int actual_main(int argc, char** argv) {
             const SDL_Color bg = {0xdd, 0xdd, 0xdd};
             const SDL_Color fg = {0x00, 0x00, 0x00};
 
-            Size_Cache* menu_font = open_font(&rend, font_path, (int)(menu_font_size * dpi_scale));
+            Size_Cache* menu_font = open_font(&rend, font_path, (int)(wfc_font_size * dpi_scale));
             if (!menu_font) {
                 fprintf(stderr, "TTF_OpenFont failed: %s\n", SDL_GetError());
                 return 1;
