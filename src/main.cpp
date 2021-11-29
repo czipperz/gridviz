@@ -174,6 +174,10 @@ int actual_main(int argc, char** argv) {
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                     return 0;
                 if (event.key.keysym.sym == SDLK_LEFT && the_run) {
+                    if (the_run->selected_stroke >= the_run->strokes.len &&
+                        the_run->strokes.len > 0) {
+                        the_run->selected_stroke--;
+                    }
                     if (the_run->selected_stroke > 0)
                         the_run->selected_stroke--;
                 }
@@ -212,7 +216,8 @@ int actual_main(int argc, char** argv) {
             SDL_Rect plane_rect = {timeline_width, 0, surface->w - timeline_width, surface->h};
             SDL_SetClipRect(surface, &plane_rect);
 
-            for (size_t s = 0; s < the_run->selected_stroke; ++s) {
+            for (size_t s = 0; s < cz::min(the_run->strokes.len, the_run->selected_stroke + 1);
+                 ++s) {
                 Stroke* stroke = &the_run->strokes[s];
                 for (size_t i = 0; i < stroke->events.len; ++i) {
                     Event& event = stroke->events[i];
@@ -274,10 +279,12 @@ int actual_main(int argc, char** argv) {
             for (size_t i = 0; i < the_run->strokes.len; ++i) {
                 Stroke* stroke = &the_run->strokes[i];
                 SDL_Color fg = fg_ignored;
-                if (i == the_run->selected_stroke)
+                if (i == the_run->selected_stroke ||
+                    (i == the_run->selected_stroke - 1 && i == the_run->strokes.len - 1)) {
                     fg = fg_selected;
-                else if (i < the_run->selected_stroke)
+                } else if (i < the_run->selected_stroke) {
                     fg = fg_applied;
+                }
                 render_timeline_line(menu_font, surface, &text_rect_start, &text_rect_end, bg, fg,
                                      stroke->title);
 
