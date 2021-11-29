@@ -173,7 +173,7 @@ int actual_main(int argc, char** argv) {
             case SDL_KEYDOWN:
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                     return 0;
-                if (event.key.keysym.sym == SDLK_LEFT && the_run) {
+                if (event.key.keysym.sym == SDLK_UP && the_run) {
                     if (the_run->selected_stroke >= the_run->strokes.len &&
                         the_run->strokes.len > 0) {
                         the_run->selected_stroke--;
@@ -181,7 +181,7 @@ int actual_main(int argc, char** argv) {
                     if (the_run->selected_stroke > 0)
                         the_run->selected_stroke--;
                 }
-                if (event.key.keysym.sym == SDLK_RIGHT && the_run) {
+                if (event.key.keysym.sym == SDLK_DOWN && the_run) {
                     if (the_run->selected_stroke < the_run->strokes.len)
                         the_run->selected_stroke++;
                 }
