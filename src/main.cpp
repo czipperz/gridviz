@@ -131,7 +131,7 @@ int actual_main(int argc, char** argv) {
         SDL_Surface* surface = SDL_GetWindowSurface(window);
         SDL_FillRect(surface, NULL, SDL_MapRGB(surface->format, 0xff, 0xff, 0xff));
 
-        int bottom_height = 200;
+        int bottom_height = 100;
 
         /////////////////////////////////////////
         // Main plane
@@ -178,7 +178,7 @@ int actual_main(int argc, char** argv) {
             SDL_FillRect(surface, &bar_rect, SDL_MapRGB(surface->format, bg.r, bg.g, bg.b));
 
             // Green slider.  TODO change color based on if future or past.
-            SDL_Rect slider_rect = {bar_rect.x + 20, bar_rect.y + 120, bar_rect.w - 40, 60};
+            SDL_Rect slider_rect = {bar_rect.x + 20, bar_rect.y + 50, bar_rect.w - 40, 30};
             SDL_FillRect(surface, &slider_rect, SDL_MapRGB(surface->format, 0x00, 0xff, 0x00));
 
             // Draw title.
@@ -196,13 +196,19 @@ int actual_main(int argc, char** argv) {
 
             // Draw vertical bars for each event.
             {
-                SDL_Color color = {0x00, 0x00, 0x00};
-                uint32_t color32 = SDL_MapRGB(surface->format, color.r, color.g, color.b);
+                uint32_t normal_color = SDL_MapRGB(surface->format, 0x00, 0x00, 0x00);
+                uint32_t selected_color = SDL_MapRGB(surface->format, 0xff, 0x00, 0x00);
                 double event_width = (double)slider_rect.w / (double)events.len;
                 double x = slider_rect.x;
                 for (size_t i = 0; i < events.len + 1; ++i) {
                     SDL_Rect line_rect = {x, slider_rect.y, 1, slider_rect.h};
-                    SDL_FillRect(surface, &line_rect, color32);
+                    if (i == selected_event) {
+                        line_rect.w = 3;
+                        line_rect.x -= 1;
+                        SDL_FillRect(surface, &line_rect, selected_color);
+                    } else {
+                        SDL_FillRect(surface, &line_rect, normal_color);
+                    }
                     x += event_width;
                 }
             }
