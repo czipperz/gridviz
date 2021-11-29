@@ -185,8 +185,8 @@ int actual_main(int argc, char** argv) {
 
             case SDL_MOUSEBUTTONDOWN:
                 if (event.button.button == SDL_BUTTON_LEFT && the_run) {
-                    int window_width, window_height;
-                    SDL_GetWindowSize(window, &window_width, &window_height);
+                    int window_width;
+                    SDL_GetWindowSize(window, &window_width, nullptr);
                     if (event.button.x > get_timeline_width(window_width)) {
                         dragging = 1;
                     } else {
@@ -219,6 +219,50 @@ int actual_main(int argc, char** argv) {
                     }
                 }
                 break;
+
+            case SDL_MOUSEWHEEL: {
+                if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED) {
+                    event.wheel.y *= -1;
+                    event.wheel.x *= -1;
+                }
+
+// On linux the horizontal scroll is flipped for some reason.
+#ifndef _WIN32
+                event.wheel.x *= -1;
+#endif
+
+                if (the_run) {
+                    float old_zoom = the_run->zoom;
+                    if (event.wheel.y < 0) {
+                        // Scroll down - zoom out.
+                        the_run->zoom /= 1.25f;
+                    } else if (event.wheel.y > 0) {
+                        // Scroll up - zoom in.
+                        the_run->zoom *= 1.25f;
+                    }
+                    float new_zoom = the_run->zoom;
+                    the_run->font_size = (int)(14 * the_run->zoom);
+
+                    //
+                    // Zoom around the mouse.  Note: the offsets are at the current zoom level.
+                    //
+
+                    // Get mouse position in the plane.
+                    int mouse_x = 0, mouse_y = 0, window_width = 0;
+                    SDL_GetMouseState(&mouse_x, &mouse_y);
+                    SDL_GetWindowSize(window, &window_width, nullptr);
+                    int64_t m2_x = mouse_x - get_timeline_width(window_width);
+                    int64_t m2_y = mouse_y - header_height;
+
+                    // Make the mouse the origin then zoom then revert.
+                    the_run->off_x -= m2_x;
+                    the_run->off_y -= m2_y;
+                    the_run->off_x *= new_zoom / old_zoom;
+                    the_run->off_y *= new_zoom / old_zoom;
+                    the_run->off_x += m2_x;
+                    the_run->off_y += m2_y;
+                }
+            } break;
 
             case SDL_KEYDOWN:
                 if (event.key.keysym.sym == SDLK_ESCAPE)

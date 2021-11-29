@@ -35,6 +35,7 @@ struct Run_Info {
     int64_t off_y;
     int font_size;
     cz::Date start_time;
+    float zoom = 1.0f;
 };
 
 struct Game_State {
