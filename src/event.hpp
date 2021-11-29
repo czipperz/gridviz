@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <cz/str.hpp>
+#include <cz/vector.hpp>
 
 namespace gridviz {
 
@@ -29,6 +30,18 @@ union Event {
 struct Stroke {
     cz::Str title;
     cz::Vector<Event> events;
+};
+
+struct Run_Info {
+    cz::Vector<Stroke> strokes;
+    size_t selected_stroke;
+    int64_t off_x;
+    int64_t off_y;
+};
+
+struct Game_State {
+    cz::Vector<Run_Info> runs;
+    size_t selected_run;
 };
 
 }

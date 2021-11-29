@@ -37,6 +37,7 @@ int actual_main(int argc, char** argv) {
 
     Render_State rend = {};
     Network_State* net = nullptr;
+    Game_State game = {};
 
     rend.font_size = 14;
     int port = 41088;
@@ -92,15 +93,20 @@ int actual_main(int argc, char** argv) {
 
     net = start_networking(port);
 
-    cz::Vector<Stroke> strokes = {};
-    strokes.reserve(cz::heap_allocator(), 4);
-    strokes.push({"Stroke 0"});
-    size_t selected_stroke = strokes.len;
-
     bool dragging = false;
+    Run_Info* previously_selected_run = NULL;
 
     while (1) {
         uint32_t start_frame = SDL_GetTicks();
+
+        Run_Info* the_run =
+            (game.selected_run < game.runs.len ? &game.runs[game.selected_run] : NULL);
+
+        if (previously_selected_run != the_run) {
+            previously_selected_run = the_run;
+            // Selection changed.
+            dragging = false;
+        }
 
         for (SDL_Event event; SDL_PollEvent(&event);) {
             switch (event.type) {
@@ -108,7 +114,7 @@ int actual_main(int argc, char** argv) {
                 return 0;
 
             case SDL_MOUSEBUTTONDOWN:
-                if (event.button.button == SDL_BUTTON_LEFT) {
+                if (event.button.button == SDL_BUTTON_LEFT && the_run) {
                     int window_width, window_height;
                     SDL_GetWindowSize(window, &window_width, &window_height);
                     if (event.button.y < window_height - bottom_height) {
@@ -120,8 +126,9 @@ int actual_main(int argc, char** argv) {
                                                 30};
                         SDL_Point point = {event.button.x, event.button.y};
                         if (SDL_PointInRect(&point, &slider_rect)) {
-                            double event_width = (double)slider_rect.w / (double)strokes.len;
-                            selected_stroke =
+                            double event_width =
+                                (double)slider_rect.w / (double)the_run->strokes.len;
+                            the_run->selected_stroke =
                                 (size_t)((point.x - slider_rect.x) / event_width + 0.5);
                         }
                     }
@@ -136,31 +143,28 @@ int actual_main(int argc, char** argv) {
 
             case SDL_MOUSEMOTION:
                 // Dragging with left button.
-                if (event.motion.state & SDL_BUTTON_LMASK) {
-                    rend.off_x += event.motion.xrel;
-                    rend.off_y += event.motion.yrel;
+                if ((event.motion.state & SDL_BUTTON_LMASK) && the_run) {
+                    the_run->off_x += event.motion.xrel;
+                    the_run->off_y += event.motion.yrel;
                 }
                 break;
 
             case SDL_KEYDOWN:
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                     return 0;
-                if (event.key.keysym.sym == SDLK_LEFT) {
-                    if (selected_stroke > 0)
-                        selected_stroke--;
+                if (event.key.keysym.sym == SDLK_LEFT && the_run) {
+                    if (the_run->selected_stroke > 0)
+                        the_run->selected_stroke--;
                 }
-                if (event.key.keysym.sym == SDLK_RIGHT) {
-                    if (selected_stroke < strokes.len)
-                        selected_stroke++;
+                if (event.key.keysym.sym == SDLK_RIGHT && the_run) {
+                    if (the_run->selected_stroke < the_run->strokes.len)
+                        the_run->selected_stroke++;
                 }
                 break;
             }
         }
 
-        bool advance = (selected_stroke == strokes.len);
-        poll_network(net, &strokes);
-        if (advance)
-            selected_stroke = strokes.len;
+        poll_network(net, &game);
 
         SDL_Surface* surface = SDL_GetWindowSurface(window);
         SDL_FillRect(surface, NULL, SDL_MapRGB(surface->format, 0xff, 0xff, 0xff));
@@ -168,12 +172,12 @@ int actual_main(int argc, char** argv) {
         /////////////////////////////////////////
         // Main plane
         /////////////////////////////////////////
-        {
+        if (the_run) {
             SDL_Rect plane_rect = {0, 0, surface->w, surface->h - bottom_height};
             SDL_SetClipRect(surface, &plane_rect);
 
-            for (size_t s = 0; s < selected_stroke; ++s) {
-                Stroke* stroke = &strokes[s];
+            for (size_t s = 0; s < the_run->selected_stroke; ++s) {
+                Stroke* stroke = &the_run->strokes[s];
                 for (size_t i = 0; i < stroke->events.len; ++i) {
                     Event& event = stroke->events[i];
                     switch (event.type) {
@@ -230,14 +234,14 @@ int actual_main(int argc, char** argv) {
             }
 
             // Draw vertical bars for each event.
-            {
+            if (the_run) {
                 uint32_t normal_color = SDL_MapRGB(surface->format, 0x00, 0x00, 0x00);
                 uint32_t selected_color = SDL_MapRGB(surface->format, 0xff, 0x00, 0x00);
-                double event_width = (double)slider_rect.w / (double)strokes.len;
+                double event_width = (double)slider_rect.w / (double)the_run->strokes.len;
                 double x = slider_rect.x;
-                for (size_t i = 0; i < strokes.len + 1; ++i) {
-                    SDL_Rect line_rect = {x, slider_rect.y, 1, slider_rect.h};
-                    if (i == selected_stroke) {
+                for (size_t i = 0; i < the_run->strokes.len + 1; ++i) {
+                    SDL_Rect line_rect = {(int)x, slider_rect.y, 1, slider_rect.h};
+                    if (i == the_run->selected_stroke) {
                         line_rect.w = 3;
                         line_rect.x -= 1;
                         SDL_FillRect(surface, &line_rect, selected_color);

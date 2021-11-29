@@ -4,10 +4,10 @@
 #include <cz/format.hpp>
 #include <cz/heap.hpp>
 
-#include <stdio.h>
-
 #define NETGRIDVIZ_DEFINE_PROTOCOL
 #include "../netgridviz.h"
+
+#include "event.hpp"
 
 ///////////////////////////////////////////////////////////////////////////////
 // Xplat craziness
@@ -46,7 +46,7 @@
 namespace gridviz {
 
 static int actually_start_server(Network_State* net, int port);
-static void actually_poll_server(Network_State* net);
+static void actually_poll_server(Network_State* net, Game_State* game);
 
 static int winsock_start(void);
 static int winsock_end(void);
@@ -155,8 +155,8 @@ void stop_networking(Network_State* net) {
 static size_t get_event_length(uint8_t type, cz::Str buffer);
 static netgridviz_context* lookup_context(Network_State* net, uint16_t context_id);
 
-void poll_network(Network_State* net, cz::Vector<Stroke>* strokes) {
-    actually_poll_server(net);
+void poll_network(Network_State* net, Game_State* game) {
+    actually_poll_server(net, game);
 
     while (1) {
         if (net->buffer.len == 0)
@@ -173,6 +173,8 @@ void poll_network(Network_State* net, cz::Vector<Stroke>* strokes) {
         memcpy(&context_id, net->buffer.buffer + 1, 2);
         netgridviz_context* context = lookup_context(net, context_id);
 
+        Run_Info* the_run = &game->runs.last();
+
         switch (type) {
         case GRIDVIZ_SET_FG:
             memcpy(&context->fg, net->buffer.buffer + 3, 3);
@@ -182,25 +184,26 @@ void poll_network(Network_State* net, cz::Vector<Stroke>* strokes) {
             break;
 
         case GRIDVIZ_START_STROKE: {
-            printf("start stroke\n");
             if (net->reuse_first_stroke) {
                 net->reuse_first_stroke = false;
             } else {
-                strokes->reserve(cz::heap_allocator(), 1);
-                strokes->push({});
+                the_run->strokes.reserve(cz::heap_allocator(), 1);
+                the_run->strokes.push({});
+
+                if (the_run->selected_stroke == the_run->strokes.len - 1)
+                    the_run->selected_stroke = the_run->strokes.len;
             }
 
             cz::Str title;
             if (length == 5) {
-                title = cz::format(cz::heap_allocator(), "Stroke ", strokes->len - 1);
+                title = cz::format(cz::heap_allocator(), "Stroke ", the_run->strokes.len - 1);
             } else {
                 title = net->buffer.slice(5, length).clone(cz::heap_allocator());
             }
-            strokes->last().title = title;
+            the_run->strokes.last().title = title;
         } break;
 
         case GRIDVIZ_SEND_CHAR: {
-            printf("send char\n");
             net->reuse_first_stroke = false;
 
             int64_t x = 0, y = 0;
@@ -217,7 +220,7 @@ void poll_network(Network_State* net, cz::Vector<Stroke>* strokes) {
             event.cp.x = x;
             event.cp.y = y;
 
-            Stroke* stroke = &strokes->last();
+            Stroke* stroke = &the_run->strokes.last();
             stroke->events.reserve(cz::heap_allocator(), 1);
             stroke->events.push(event);
         } break;
@@ -269,7 +272,7 @@ static netgridviz_context* lookup_context(Network_State* net, uint16_t context_i
     return &net->contexts[index];
 }
 
-static void actually_poll_server(Network_State* net) {
+static void actually_poll_server(Network_State* net, Game_State* game) {
     if (!net->running) {
         return;
     }
@@ -299,9 +302,19 @@ static void actually_poll_server(Network_State* net) {
             return;
         }
 
+        // Start a new client connection.
         net->socket_client = client;
         net->contexts.len = 0;
         net->reuse_first_stroke = true;
+
+        // Create a new run and select it.
+        Run_Info the_run = {};
+        the_run.strokes.reserve(cz::heap_allocator(), 1);
+        the_run.strokes.push({"Stroke 0"});
+        the_run.selected_stroke = 1;
+        game->runs.reserve(cz::heap_allocator(), 1);
+        game->runs.push(the_run);
+        game->selected_run = game->runs.len - 1;
     }
 }
 
