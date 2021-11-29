@@ -68,6 +68,33 @@ static void render_timeline_line(Size_Cache* font,
     text_rect_start->y += font->font_height;
 }
 
+static bool find_matching_stroke(cz::Slice<SDL_Rect> the_stroke_rects,
+                                 SDL_Point point,
+                                 size_t* index) {
+    for (size_t i = 0; i < the_stroke_rects.len; ++i) {
+        SDL_Rect rect = the_stroke_rects[i];
+        if (SDL_PointInRect(&point, &rect)) {
+            *index = i;
+            return true;
+        }
+    }
+
+    if (the_stroke_rects.len == 0)
+        return false;
+
+    // If flick up or down fast then recognize that.
+    if (point.x < the_stroke_rects[0].y) {
+        *index = 0;
+        return true;
+    }
+    if (point.y > the_stroke_rects.last().y + the_stroke_rects.last().h) {
+        *index = the_stroke_rects.len;
+        return true;
+    }
+
+    return false;
+}
+
 int actual_main(int argc, char** argv) {
     ZoneScoped;
 
@@ -165,13 +192,8 @@ int actual_main(int argc, char** argv) {
                     } else {
                         // Select a new stroke.
                         SDL_Point point = {event.button.x, event.button.y};
-                        for (size_t i = 0; i < the_stroke_rects.len; ++i) {
-                            SDL_Rect rect = the_stroke_rects[i];
-                            if (SDL_PointInRect(&point, &rect)) {
-                                the_run->selected_stroke = i;
-                                break;
-                            }
-                        }
+                        (void)find_matching_stroke(the_stroke_rects, point,
+                                                   &the_run->selected_stroke);
                         dragging = 2;
                     }
                 }
@@ -192,13 +214,8 @@ int actual_main(int argc, char** argv) {
                     } else if (the_run && dragging == 2) {
                         // Selecting stroke.
                         SDL_Point point = {event.motion.x, event.motion.y};
-                        for (size_t i = 0; i < the_stroke_rects.len; ++i) {
-                            SDL_Rect rect = the_stroke_rects[i];
-                            if (SDL_PointInRect(&point, &rect)) {
-                                the_run->selected_stroke = i;
-                                break;
-                            }
-                        }
+                        (void)find_matching_stroke(the_stroke_rects, point,
+                                                   &the_run->selected_stroke);
                     }
                 }
                 break;
