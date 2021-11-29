@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <Tracy.hpp>
 #include <cz/buffer_array.hpp>
+#include <cz/date.hpp>
 #include <cz/defer.hpp>
 #include <cz/heap.hpp>
 #include <cz/str.hpp>
@@ -20,6 +21,8 @@
 #endif
 
 using namespace gridviz;
+
+const int header_height = 40;
 
 static int get_timeline_width(int window_width) {
     return window_width / 3;
@@ -70,6 +73,7 @@ int actual_main(int argc, char** argv) {
 
     int menu_font_size = 14;
     int wfc_font_size = 20;
+    int header_font_size = 14;
     int port = 41088;
 
 #ifdef _WIN32
@@ -234,6 +238,60 @@ int actual_main(int argc, char** argv) {
         int timeline_width = get_timeline_width(surface->w);
 
         /////////////////////////////////////////
+        // Header
+        /////////////////////////////////////////
+        {
+            // Color constants.
+            const SDL_Color bg = {0xbb, 0xbb, 0xbb};
+            const SDL_Color fg = {0x00, 0x00, 0x00};
+            const int hor_padding = 10;
+
+            // Open font.
+            Size_Cache* header_font =
+                open_font(&rend, font_path, (int)(header_font_size * dpi_scale));
+            if (!header_font) {
+                fprintf(stderr, "TTF_OpenFont failed: %s\n", SDL_GetError());
+                return 1;
+            }
+
+            // Clip and fill.
+            SDL_Rect plane_rect = {0, 0, surface->w, header_height};
+            SDL_SetClipRect(surface, &plane_rect);
+            SDL_FillRect(surface, &plane_rect, SDL_MapRGB(surface->format, bg.r, bg.g, bg.b));
+
+            // Draw bottom line.
+            SDL_Rect bottom_line = {0, header_height - 1, surface->w, 1};
+            SDL_FillRect(surface, &bottom_line, SDL_MapRGB(surface->format, 0x00, 0x00, 0x00));
+
+            // Draw middle indicator.
+            for (int iter = 0; iter < 3; ++iter) {
+                Run_Info* iter_run = nullptr;
+                int64_t index = (int64_t)game.selected_run + iter - 1;
+                if (index >= 0 && index < game.runs.len)
+                    iter_run = &game.runs[index];
+
+                if (iter_run) {
+                    time_t time = std::chrono::system_clock::to_time_t(iter_run->start_time);
+                    cz::Date date = cz::time_t_to_date_local(time);
+
+                    char buffer[20];
+                    snprintf(buffer, sizeof(buffer), "%04d/%02d/%02d %02d:%02d:%02d", date.year,
+                             date.month, date.day_of_month, date.hour, date.minute, date.second);
+                    size_t buflen = sizeof(buffer) - 1;
+
+                    int64_t x = (surface->w - hor_padding - header_font->font_width * buflen);
+                    x = x * iter / 2;
+                    int64_t y = 0;
+                    for (size_t i = 0; i < buflen; ++i) {
+                        char seq[5] = {(char)buffer[i]};
+                        (void)render_code_point(header_font, surface, x, y, bg, fg, seq);
+                        x += header_font->font_width;
+                    }
+                }
+            }
+        }
+
+        /////////////////////////////////////////
         // Main plane
         /////////////////////////////////////////
         if (the_run) {
@@ -244,7 +302,8 @@ int actual_main(int argc, char** argv) {
                 return 1;
             }
 
-            SDL_Rect plane_rect = {timeline_width, 0, surface->w - timeline_width, surface->h};
+            SDL_Rect plane_rect = {timeline_width, header_height, surface->w - timeline_width,
+                                   surface->h - header_height};
             SDL_SetClipRect(surface, &plane_rect);
 
             for (size_t s = 0; s < cz::min(the_run->strokes.len, the_run->selected_stroke + 1);
@@ -257,6 +316,7 @@ int actual_main(int argc, char** argv) {
                         int64_t x = event.cp.x * run_font->font_width + the_run->off_x;
                         int64_t y = event.cp.y * run_font->font_height + the_run->off_y;
                         x += timeline_width;
+                        y += header_height;
 
                         SDL_Color bg = {event.cp.bg[0], event.cp.bg[1], event.cp.bg[2]};
                         SDL_Color fg = {event.cp.fg[0], event.cp.fg[1], event.cp.fg[2]};
@@ -291,7 +351,7 @@ int actual_main(int argc, char** argv) {
                 return 1;
             }
 
-            SDL_Rect bar_rect = {0, 0, timeline_width, surface->h};
+            SDL_Rect bar_rect = {0, header_height, timeline_width, surface->h - header_height};
             SDL_SetClipRect(surface, &bar_rect);
 
             // Gray background.
@@ -323,13 +383,13 @@ int actual_main(int argc, char** argv) {
                 } else if (i < the_run->selected_stroke) {
                     fg = fg_applied;
                 }
-                SDL_Rect stroke_rect = {text_rect_start.x, text_rect_start.y,
+                SDL_Rect stroke_rect = {text_rect_start.x, text_rect_start.y - 2,
                                         bar_rect.w - padding * 2, 0};
 
                 render_timeline_line(menu_font, surface, &text_rect_start, &text_rect_end, bg, fg,
                                      stroke->title);
 
-                stroke_rect.h = text_rect_start.y - stroke_rect.y;
+                stroke_rect.h = text_rect_start.y - stroke_rect.y + 2 * 2;
                 the_stroke_rects.reserve(cz::heap_allocator(), 1);
                 the_stroke_rects.push(stroke_rect);
 
@@ -357,6 +417,9 @@ int actual_main(int argc, char** argv) {
                 fprintf(stderr, "TTF_OpenFont failed: %s\n", SDL_GetError());
                 return 1;
             }
+
+            SDL_Rect plane_rect = {0, header_height, surface->w, surface->h - header_height};
+            SDL_SetClipRect(surface, &plane_rect);
 
             cz::Str message1 = "WAITING FOR CONNECTION";
             cz::Str message2 = "...";

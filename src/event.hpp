@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <chrono>
 #include <cz/str.hpp>
 #include <cz/vector.hpp>
 
@@ -33,6 +34,7 @@ struct Run_Info {
     int64_t off_x;
     int64_t off_y;
     int font_size;
+    std::chrono::system_clock::time_point start_time;
 };
 
 struct Game_State {

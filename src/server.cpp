@@ -315,6 +315,7 @@ static void actually_poll_server(Network_State* net, Game_State* game) {
         // TODO pull out graphical stuff
         the_run.selected_stroke = 1;
         the_run.font_size = 14;
+        the_run.start_time = std::chrono::system_clock::now();
         game->runs.reserve(cz::heap_allocator(), 1);
         game->runs.push(the_run);
         game->selected_run = game->runs.len - 1;
