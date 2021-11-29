@@ -100,7 +100,7 @@ static SDL_Surface* rasterize_code_point_cached(Size_Cache* rend,
                        ((uint32_t)color.b << 0);
     if (!cz::binary_search(rend->colors.as_slice(), color32, &index)) {
         rend->colors.reserve(cz::heap_allocator(), 1);
-        rend->colors.insert(index, {});
+        rend->colors.insert(index, color32);
         rend->by_color.reserve(cz::heap_allocator(), 1);
         rend->by_color.insert(index, {});
     }
