@@ -19,6 +19,8 @@
 
 using namespace gridviz;
 
+const int bottom_height = 100;
+
 int actual_main(int argc, char** argv) {
     ZoneScoped;
 
@@ -92,6 +94,8 @@ int actual_main(int argc, char** argv) {
     net = start_networking(port);
     size_t selected_event = events.len;
 
+    bool dragging = false;
+
     while (1) {
         uint32_t start_frame = SDL_GetTicks();
 
@@ -99,6 +103,33 @@ int actual_main(int argc, char** argv) {
             switch (event.type) {
             case SDL_QUIT:
                 return 0;
+
+            case SDL_MOUSEBUTTONDOWN:
+                if (event.button.button == SDL_BUTTON_LEFT) {
+                    int window_width, window_height;
+                    SDL_GetWindowSize(window, &window_width, &window_height);
+                    if (event.button.y < window_height - bottom_height) {
+                        dragging = true;
+                    } else {
+                        SDL_Rect bar_rect = {0, window_height - bottom_height, window_width,
+                                             bottom_height};
+                        SDL_Rect slider_rect = {bar_rect.x + 20, bar_rect.y + 50, bar_rect.w - 40,
+                                                30};
+                        SDL_Point point = {event.button.x, event.button.y};
+                        if (SDL_PointInRect(&point, &slider_rect)) {
+                            double event_width = (double)slider_rect.w / (double)events.len;
+                            selected_event =
+                                (size_t)((point.x - slider_rect.x) / event_width + 0.5);
+                        }
+                    }
+                }
+                break;
+
+            case SDL_MOUSEBUTTONUP:
+                if (event.button.button == SDL_BUTTON_LEFT) {
+                    dragging = false;
+                }
+                break;
 
             case SDL_MOUSEMOTION:
                 // Dragging with left button.
@@ -130,8 +161,6 @@ int actual_main(int argc, char** argv) {
 
         SDL_Surface* surface = SDL_GetWindowSurface(window);
         SDL_FillRect(surface, NULL, SDL_MapRGB(surface->format, 0xff, 0xff, 0xff));
-
-        int bottom_height = 100;
 
         /////////////////////////////////////////
         // Main plane
