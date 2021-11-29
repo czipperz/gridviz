@@ -113,8 +113,11 @@ int actual_main(int argc, char** argv) {
 
     net = start_networking(port);
 
-    bool dragging = false;
+    int dragging = 0;
+    cz::Vector<SDL_Rect> the_stroke_rects = {};
     Run_Info* previously_selected_run = NULL;
+
+    CZ_DEFER(the_stroke_rects.drop(cz::heap_allocator()));
 
     while (1) {
         uint32_t start_frame = SDL_GetTicks();
@@ -125,7 +128,8 @@ int actual_main(int argc, char** argv) {
         if (previously_selected_run != the_run) {
             previously_selected_run = the_run;
             // Selection changed.
-            dragging = false;
+            dragging = 0;
+            the_stroke_rects.len = 0;
         }
 
         for (SDL_Event event; SDL_PollEvent(&event);) {
@@ -138,36 +142,45 @@ int actual_main(int argc, char** argv) {
                     int window_width, window_height;
                     SDL_GetWindowSize(window, &window_width, &window_height);
                     if (event.button.x > get_timeline_width(window_width)) {
-                        dragging = true;
+                        dragging = 1;
                     } else {
-#if 0
-                        SDL_Rect bar_rect = {0, window_height - bottom_height, window_width,
-                                             bottom_height};
-                        SDL_Rect slider_rect = {bar_rect.x + 20, bar_rect.y + 50, bar_rect.w - 40,
-                                                30};
+                        // Select a new stroke.
                         SDL_Point point = {event.button.x, event.button.y};
-                        if (SDL_PointInRect(&point, &slider_rect)) {
-                            double event_width =
-                                (double)slider_rect.w / (double)the_run->strokes.len;
-                            the_run->selected_stroke =
-                                (size_t)((point.x - slider_rect.x) / event_width + 0.5);
+                        for (size_t i = 0; i < the_stroke_rects.len; ++i) {
+                            SDL_Rect rect = the_stroke_rects[i];
+                            if (SDL_PointInRect(&point, &rect)) {
+                                the_run->selected_stroke = i;
+                                break;
+                            }
                         }
-#endif
+                        dragging = 2;
                     }
                 }
                 break;
 
             case SDL_MOUSEBUTTONUP:
                 if (event.button.button == SDL_BUTTON_LEFT) {
-                    dragging = false;
+                    dragging = 0;
                 }
                 break;
 
             case SDL_MOUSEMOTION:
-                // Dragging with left button.
-                if ((event.motion.state & SDL_BUTTON_LMASK) && the_run && dragging) {
-                    the_run->off_x += event.motion.xrel;
-                    the_run->off_y += event.motion.yrel;
+                if (event.motion.state & SDL_BUTTON_LMASK) {
+                    if (the_run && dragging == 1) {
+                        // Panning.
+                        the_run->off_x += event.motion.xrel;
+                        the_run->off_y += event.motion.yrel;
+                    } else if (the_run && dragging == 2) {
+                        // Selecting stroke.
+                        SDL_Point point = {event.motion.x, event.motion.y};
+                        for (size_t i = 0; i < the_stroke_rects.len; ++i) {
+                            SDL_Rect rect = the_stroke_rects[i];
+                            if (SDL_PointInRect(&point, &rect)) {
+                                the_run->selected_stroke = i;
+                                break;
+                            }
+                        }
+                    }
                 }
                 break;
 
@@ -195,12 +208,18 @@ int actual_main(int argc, char** argv) {
                         game.selected_run--;
                     the_run =
                         (game.selected_run < game.runs.len ? &game.runs[game.selected_run] : NULL);
+                    // Selection changed.
+                    dragging = false;
+                    the_stroke_rects.len = 0;
                 }
                 if (event.key.keysym.sym == SDLK_RIGHT) {
                     if (game.selected_run < game.runs.len)
                         game.selected_run++;
                     the_run =
                         (game.selected_run < game.runs.len ? &game.runs[game.selected_run] : NULL);
+                    // Selection changed.
+                    dragging = false;
+                    the_stroke_rects.len = 0;
                 }
 
                 break;
@@ -294,6 +313,7 @@ int actual_main(int argc, char** argv) {
             text_rect_start.y += 2;  // account for horline
             text_rect_start.y += 4;  // add some padding
 
+            the_stroke_rects.len = 0;
             for (size_t i = 0; i < the_run->strokes.len; ++i) {
                 Stroke* stroke = &the_run->strokes[i];
                 SDL_Color fg = fg_ignored;
@@ -303,8 +323,15 @@ int actual_main(int argc, char** argv) {
                 } else if (i < the_run->selected_stroke) {
                     fg = fg_applied;
                 }
+                SDL_Rect stroke_rect = {text_rect_start.x, text_rect_start.y,
+                                        bar_rect.w - padding * 2, 0};
+
                 render_timeline_line(menu_font, surface, &text_rect_start, &text_rect_end, bg, fg,
                                      stroke->title);
+
+                stroke_rect.h = text_rect_start.y - stroke_rect.y;
+                the_stroke_rects.reserve(cz::heap_allocator(), 1);
+                the_stroke_rects.push(stroke_rect);
 
                 // Draw horizontal divider after the title.
                 text_rect_start.y += 2;  // add some padding
