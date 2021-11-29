@@ -14,12 +14,41 @@
 #include "server.hpp"
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <shellscalingapi.h>
 #endif
 
 using namespace gridviz;
 
-const int bottom_height = 100;
+static int get_timeline_width(int window_width) {
+    return window_width / 3;
+}
+
+static void render_timeline_line(Size_Cache* font,
+                                 SDL_Surface* surface,
+                                 SDL_Point* text_rect_start,
+                                 SDL_Point* text_rect_end,
+                                 SDL_Color bg,
+                                 SDL_Color fg,
+                                 cz::Str message) {
+    int x = text_rect_start->x;
+    int y = text_rect_start->y;
+    int numchars = cz::max(1, (text_rect_end->x - text_rect_start->x) / font->font_width);
+    int width = numchars * font->font_width;
+    for (size_t i = 0; i < message.len; ++i) {
+        if (x == width) {
+            x = 0;
+            y += font->font_height;
+            text_rect_start->y = y;
+        }
+
+        char seq[5] = {(char)message[i]};
+        (void)render_code_point(font, surface, x, y, bg, fg, seq);
+        x += font->font_width;
+    }
+    text_rect_start->y += font->font_height;
+}
 
 int actual_main(int argc, char** argv) {
     ZoneScoped;
@@ -107,9 +136,10 @@ int actual_main(int argc, char** argv) {
                 if (event.button.button == SDL_BUTTON_LEFT && the_run) {
                     int window_width, window_height;
                     SDL_GetWindowSize(window, &window_width, &window_height);
-                    if (event.button.y < window_height - bottom_height) {
+                    if (event.button.x > get_timeline_width(window_width)) {
                         dragging = true;
                     } else {
+#if 0
                         SDL_Rect bar_rect = {0, window_height - bottom_height, window_width,
                                              bottom_height};
                         SDL_Rect slider_rect = {bar_rect.x + 20, bar_rect.y + 50, bar_rect.w - 40,
@@ -121,6 +151,7 @@ int actual_main(int argc, char** argv) {
                             the_run->selected_stroke =
                                 (size_t)((point.x - slider_rect.x) / event_width + 0.5);
                         }
+#endif
                     }
                 }
                 break;
@@ -133,7 +164,7 @@ int actual_main(int argc, char** argv) {
 
             case SDL_MOUSEMOTION:
                 // Dragging with left button.
-                if ((event.motion.state & SDL_BUTTON_LMASK) && the_run) {
+                if ((event.motion.state & SDL_BUTTON_LMASK) && the_run && dragging) {
                     the_run->off_x += event.motion.xrel;
                     the_run->off_y += event.motion.yrel;
                 }
@@ -165,6 +196,8 @@ int actual_main(int argc, char** argv) {
             return 1;
         }
 
+        int timeline_width = get_timeline_width(surface->w);
+
         /////////////////////////////////////////
         // Main plane
         /////////////////////////////////////////
@@ -176,7 +209,7 @@ int actual_main(int argc, char** argv) {
                 return 1;
             }
 
-            SDL_Rect plane_rect = {0, 0, surface->w, surface->h - bottom_height};
+            SDL_Rect plane_rect = {timeline_width, 0, surface->w - timeline_width, surface->h};
             SDL_SetClipRect(surface, &plane_rect);
 
             for (size_t s = 0; s < the_run->selected_stroke; ++s) {
@@ -187,6 +220,7 @@ int actual_main(int argc, char** argv) {
                     case EVENT_CHAR_POINT: {
                         int64_t x = event.cp.x * run_font->font_width + the_run->off_x;
                         int64_t y = event.cp.y * run_font->font_height + the_run->off_y;
+                        x += timeline_width;
 
                         SDL_Color bg = {event.cp.bg[0], event.cp.bg[1], event.cp.bg[2]};
                         SDL_Color fg = {event.cp.fg[0], event.cp.fg[1], event.cp.fg[2]};
@@ -210,49 +244,56 @@ int actual_main(int argc, char** argv) {
         /////////////////////////////////////////
         // Timeline
         /////////////////////////////////////////
-        {
-            SDL_Rect bar_rect = {0, surface->h - bottom_height, surface->w, bottom_height};
-            SDL_SetClipRect(surface, &bar_rect);
+        if (the_run) {
+            // Color constants.
+            const SDL_Color bg = {0xdd, 0xdd, 0xdd};
+            const SDL_Color fg_selected = {0x00, 0x00, 0xd7};
+            const SDL_Color fg_applied = {0x00, 0x00, 0x00};
+            const SDL_Color fg_ignored = {0x44, 0x44, 0x44};
+            const SDL_Color horline_color = {0x44, 0x44, 0x44};
+            const int padding = 8;
 
-            SDL_Color bg = {0xdd, 0xdd, 0xdd};
+            SDL_Rect bar_rect = {0, 0, timeline_width, surface->h};
+            SDL_SetClipRect(surface, &bar_rect);
 
             // Gray background.
             SDL_FillRect(surface, &bar_rect, SDL_MapRGB(surface->format, bg.r, bg.g, bg.b));
 
-            // Green slider.  TODO change color based on if future or past.
-            SDL_Rect slider_rect = {bar_rect.x + 20, bar_rect.y + 50, bar_rect.w - 40, 30};
-            SDL_FillRect(surface, &slider_rect, SDL_MapRGB(surface->format, 0x00, 0xff, 0x00));
+            SDL_Point text_rect_start = {bar_rect.x + padding, bar_rect.y + padding};
+            SDL_Point text_rect_end = {bar_rect.w - padding, bar_rect.h - padding};
 
             // Draw title.
-            {
-                SDL_Color fg = {0x00, 0x00, 0x00};
-                int x = bar_rect.x + 20;
-                int y = bar_rect.y + 20;
-                cz::Str message = "Time line:";
-                for (size_t i = 0; i < message.len; ++i) {
-                    char seq[5] = {(char)message[i]};
-                    (void)render_code_point(menu_font, surface, x, y, bg, fg, seq);
-                    x += menu_font->font_width;
-                }
-            }
+            render_timeline_line(menu_font, surface, &text_rect_start, &text_rect_end, bg,
+                                 fg_applied, "Time line:");
 
-            // Draw vertical bars for each event.
-            if (the_run) {
-                uint32_t normal_color = SDL_MapRGB(surface->format, 0x00, 0x00, 0x00);
-                uint32_t selected_color = SDL_MapRGB(surface->format, 0xff, 0x00, 0x00);
-                double event_width = (double)slider_rect.w / (double)the_run->strokes.len;
-                double x = slider_rect.x;
-                for (size_t i = 0; i < the_run->strokes.len + 1; ++i) {
-                    SDL_Rect line_rect = {(int)x, slider_rect.y, 1, slider_rect.h};
-                    if (i == the_run->selected_stroke) {
-                        line_rect.w = 7;
-                        line_rect.x -= 3;
-                        SDL_FillRect(surface, &line_rect, selected_color);
-                    } else {
-                        SDL_FillRect(surface, &line_rect, normal_color);
-                    }
-                    x += event_width;
-                }
+            // Draw horizontal divider after the title.
+            text_rect_start.y += 4;  // add some padding
+            SDL_Rect horline = {bar_rect.x, text_rect_start.y, bar_rect.w, 2};
+            SDL_FillRect(
+                surface, &horline,
+                SDL_MapRGB(surface->format, horline_color.r, horline_color.g, horline_color.b));
+            text_rect_start.y += 2;  // account for horline
+            text_rect_start.y += 4;  // add some padding
+
+            for (size_t i = 0; i < the_run->strokes.len; ++i) {
+                Stroke* stroke = &the_run->strokes[i];
+                SDL_Color fg = fg_ignored;
+                if (i == the_run->selected_stroke)
+                    fg = fg_selected;
+                else if (i < the_run->selected_stroke)
+                    fg = fg_applied;
+                render_timeline_line(menu_font, surface, &text_rect_start, &text_rect_end, bg, fg,
+                                     stroke->title);
+
+                // Draw horizontal divider after the title.
+                text_rect_start.y += 2;  // add some padding
+                SDL_Rect horline = {bar_rect.x + padding, text_rect_start.y,
+                                    bar_rect.w - 2 * padding, 1};
+                SDL_FillRect(
+                    surface, &horline,
+                    SDL_MapRGB(surface->format, horline_color.r, horline_color.g, horline_color.b));
+                text_rect_start.y += 1;  // account for horline
+                text_rect_start.y += 2;  // add some padding
             }
         }
 

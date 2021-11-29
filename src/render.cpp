@@ -136,9 +136,11 @@ bool render_code_point(Size_Cache* rend,
     ZoneScoped;
 
     // Completely offscreen are ignored.
-    if (px >= window_surface->w || py >= window_surface->h)
+    int64_t relx = px - window_surface->clip_rect.x;
+    int64_t rely = py - window_surface->clip_rect.y;
+    if (relx >= window_surface->clip_rect.w || rely >= window_surface->clip_rect.h)
         return false;
-    if (px + rend->font_width < 0 || py + rend->font_height < 0)
+    if (relx + rend->font_width < 0 || rely + rend->font_height < 0)
         return false;
 
     char seq[5];
