@@ -226,6 +226,12 @@ int actual_main(int argc, char** argv) {
                     the_stroke_rects.len = 0;
                 }
 
+                // Reset offset.
+                if (event.key.keysym.sym == SDLK_0 && the_run) {
+                    the_run->off_x = 10;
+                    the_run->off_y = 10;
+                }
+
                 break;
             }
         }
