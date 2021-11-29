@@ -38,9 +38,9 @@ void netgridviz_disconnect(void);
 // Context
 /////////////////////////////////////////////////
 
-/// Create a new context.  You can have multiple contexts and .
+/// Create a new context.  You can have multiple contexts.  Right now a
+/// context is only used to store foreground and background color data.
 netgridviz_context netgridviz_create_context(void);
-netgridviz_context netgridviz_make_context(uint16_t id);
 
 /// Set colors.
 void netgridviz_set_fg(netgridviz_context* context, uint8_t r, uint8_t g, uint8_t b);
@@ -56,6 +56,8 @@ void netgridviz_set_bg(netgridviz_context* context, uint8_t r, uint8_t g, uint8_
 /// Start a stroke (a series of draw commands that are one "undo/redo"
 /// unit).  Title is optional (null or empty string will count as no input).
 void netgridviz_start_stroke(const char* title);
+
+/// End a stroke.  Note: starting a new stroke will automatically end the previous stroke.
 void netgridviz_end_stroke(void);
 
 /// Draw a character.
@@ -86,7 +88,7 @@ void netgridviz_draw_vfmt(netgridviz_context* context,
 #define GRIDVIZ_START_STROKE 3
 #define GRIDVIZ_SEND_CHAR 4
 
-netgridviz_context netgridviz_make_context(uint16_t id) {
+static netgridviz_context netgridviz_make_context(uint16_t id) {
     netgridviz_context context = {id};
     // White foreground.
     context.fg[0] = 0x00;
