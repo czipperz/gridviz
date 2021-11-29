@@ -330,6 +330,17 @@ int actual_main(int argc, char** argv) {
                     }
                 }
             }
+
+            // Draw axes.
+            SDL_Rect axis_x = {0, the_run->off_y, surface->w, 1};
+            SDL_Rect axis_y = {the_run->off_x, 0, 1, surface->h};
+            axis_x.x += timeline_width;
+            axis_x.y += header_height;
+            axis_y.x += timeline_width;
+            axis_y.y += header_height;
+            uint32_t axis_color32 = SDL_MapRGB(surface->format, 0x88, 0x88, 0x88);
+            SDL_FillRect(surface, &axis_x, axis_color32);
+            SDL_FillRect(surface, &axis_y, axis_color32);
         }
 
         /////////////////////////////////////////
