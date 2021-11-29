@@ -190,6 +190,7 @@ void poll_network(Network_State* net, Game_State* game) {
                 the_run->strokes.reserve(cz::heap_allocator(), 1);
                 the_run->strokes.push({});
 
+                // TODO pull out graphical stuff
                 if (the_run->selected_stroke == the_run->strokes.len - 1)
                     the_run->selected_stroke = the_run->strokes.len;
             }
@@ -311,7 +312,9 @@ static void actually_poll_server(Network_State* net, Game_State* game) {
         Run_Info the_run = {};
         the_run.strokes.reserve(cz::heap_allocator(), 1);
         the_run.strokes.push({"Stroke 0"});
+        // TODO pull out graphical stuff
         the_run.selected_stroke = 1;
+        the_run.font_size = 14;
         game->runs.reserve(cz::heap_allocator(), 1);
         game->runs.push(the_run);
         game->selected_run = game->runs.len - 1;

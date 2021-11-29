@@ -34,9 +34,11 @@ struct Stroke {
 
 struct Run_Info {
     cz::Vector<Stroke> strokes;
+    // TODO pull out graphical stuff
     size_t selected_stroke;
     int64_t off_x;
     int64_t off_y;
+    int font_size;
 };
 
 struct Game_State {

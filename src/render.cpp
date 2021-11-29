@@ -52,37 +52,28 @@ void set_icon(SDL_Window* sdl_window) {
 // Font manipulation
 ///////////////////////////////////////////////////////////////////////////////
 
-void close_font(Render_State* rend) {
+Size_Cache* open_font(Font_State* rend, const char* path, int font_size) {
+    size_t index;
+    if (cz::binary_search(rend->font_sizes.as_slice(), font_size, &index))
+        return &rend->by_size[index];
+
     ZoneScoped;
 
-    // Destroy existing caches.
-    for (int ch = 0; ch < rend->caches.len; ch++) {
-        Surface_Cache* cache = &rend->caches[ch];
-        for (int i = 0; i < cache->surfaces.len; i++) {
-            SDL_Surface* surface = cache->surfaces.get(i);
-            SDL_FreeSurface(surface);
-        }
-        cache->code_points.len = 0;
-        cache->surfaces.len = 0;
-    }
-    rend->caches.len = 0;
+    Size_Cache size_cache = {};
+    size_cache.font = TTF_OpenFont(path, font_size);
+    if (!size_cache.font)
+        return nullptr;
 
-    // Close font.
-    if (rend->font)
-        TTF_CloseFont(rend->font);
-}
+    size_cache.font_height = TTF_FontLineSkip(size_cache.font);
+    size_cache.font_width = 10;
+    TTF_GlyphMetrics(size_cache.font, ' ', nullptr, nullptr, nullptr, nullptr,
+                     &size_cache.font_width);
 
-bool open_font(Render_State* rend, const char* path, int font_size) {
-    ZoneScoped;
-
-    TTF_Font* font2 = TTF_OpenFont(path, font_size);
-    if (!font2)
-        return false;
-
-    close_font(rend);
-    rend->font = font2;
-    rend->font_size = font_size;
-    return true;
+    rend->font_sizes.reserve(cz::heap_allocator(), 1);
+    rend->font_sizes.insert(index, font_size);
+    rend->by_size.reserve(cz::heap_allocator(), 1);
+    rend->by_size.insert(index, size_cache);
+    return &rend->by_size[index];
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -98,11 +89,7 @@ static SDL_Surface* rasterize_code_point(const char* text,
     return TTF_RenderUTF8_Blended(font, text, fgc);
 }
 
-static int64_t compare_surface_cache(const Surface_Cache& left, const Surface_Cache& right) {
-    return (int64_t)left.color - (int64_t)right.color;
-}
-
-static SDL_Surface* rasterize_code_point_cached(Render_State* rend,
+static SDL_Surface* rasterize_code_point_cached(Size_Cache* rend,
                                                 const char seq[5],
                                                 SDL_Color color) {
     uint32_t code_point = unicode::utf8_code_point((const uint8_t*)seq);
@@ -111,16 +98,15 @@ static SDL_Surface* rasterize_code_point_cached(Render_State* rend,
     size_t index;
     uint32_t color32 = ((uint32_t)color.r << 16) | ((uint32_t)color.g << 8) |  //
                        ((uint32_t)color.b << 0);
-    Surface_Cache fake_cache = {color32};
-    if (!cz::binary_search(rend->caches.as_slice(), fake_cache, &index, compare_surface_cache)) {
-        rend->caches.reserve(cz::heap_allocator(), 1);
-        Surface_Cache cache = {};
-        cache.color = color32;
-        rend->caches.insert(index, cache);
+    if (!cz::binary_search(rend->colors.as_slice(), color32, &index)) {
+        rend->colors.reserve(cz::heap_allocator(), 1);
+        rend->colors.insert(index, {});
+        rend->by_color.reserve(cz::heap_allocator(), 1);
+        rend->by_color.insert(index, {});
     }
 
     // Check the cache.
-    Surface_Cache* cache = &rend->caches[index];
+    Color_Cache* cache = &rend->by_color[index];
     if (cz::binary_search(cache->code_points.as_slice(), code_point, &index))
         return cache->surfaces[index];  // Cache hit.
 
@@ -140,7 +126,7 @@ static SDL_Surface* rasterize_code_point_cached(Render_State* rend,
 // Module Code - render code point
 ///////////////////////////////////////////////////////////////////////////////
 
-bool render_code_point(Render_State* rend,
+bool render_code_point(Size_Cache* rend,
                        SDL_Surface* window_surface,
                        int64_t px,
                        int64_t py,
