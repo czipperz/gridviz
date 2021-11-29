@@ -271,8 +271,7 @@ int actual_main(int argc, char** argv) {
                     iter_run = &game.runs[index];
 
                 if (iter_run) {
-                    time_t time = std::chrono::system_clock::to_time_t(iter_run->start_time);
-                    cz::Date date = cz::time_t_to_date_local(time);
+                    cz::Date date = iter_run->start_time;
 
                     char buffer[20];
                     snprintf(buffer, sizeof(buffer), "%04d/%02d/%02d %02d:%02d:%02d", date.year,
