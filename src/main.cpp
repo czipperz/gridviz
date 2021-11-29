@@ -119,8 +119,13 @@ int actual_main(int argc, char** argv) {
         SDL_Surface* surface = SDL_GetWindowSurface(window);
         SDL_FillRect(surface, NULL, SDL_MapRGB(surface->format, 0xff, 0xff, 0xff));
 
+        int bottom_height = 200;
+
+        /////////////////////////////////////////
+        // Main plane
+        /////////////////////////////////////////
         {
-            SDL_Rect plane_rect = {0, 0, surface->w, surface->h};
+            SDL_Rect plane_rect = {0, 0, surface->w, surface->h - bottom_height};
             SDL_SetClipRect(surface, &plane_rect);
 
             for (size_t i = 0; i < events.len; ++i) {
@@ -144,6 +149,49 @@ int actual_main(int argc, char** argv) {
                 default:
                     CZ_DEBUG_ASSERT(false);  // Ignore in release mode.
                     break;
+                }
+            }
+        }
+
+        /////////////////////////////////////////
+        // Timeline
+        /////////////////////////////////////////
+        {
+            SDL_Rect bar_rect = {0, surface->h - bottom_height, surface->w, bottom_height};
+            SDL_SetClipRect(surface, &bar_rect);
+
+            SDL_Color bg = {0xdd, 0xdd, 0xdd};
+
+            // Gray background.
+            SDL_FillRect(surface, &bar_rect, SDL_MapRGB(surface->format, bg.r, bg.g, bg.b));
+
+            // Green slider.  TODO change color based on if future or past.
+            SDL_Rect slider_rect = {bar_rect.x + 20, bar_rect.y + 120, bar_rect.w - 40, 60};
+            SDL_FillRect(surface, &slider_rect, SDL_MapRGB(surface->format, 0x00, 0xff, 0x00));
+
+            // Draw title.
+            {
+                SDL_Color fg = {0x00, 0x00, 0x00};
+                int x = bar_rect.x + 20;
+                int y = bar_rect.y + 20;
+                cz::Str message = "Time line:";
+                for (size_t i = 0; i < message.len; ++i) {
+                    char seq[5] = {(char)message[i]};
+                    (void)render_code_point(&rend, surface, x, y, bg, fg, seq);
+                    x += rend.font_width;
+                }
+            }
+
+            // Draw vertical bars for each event.
+            {
+                SDL_Color color = {0x00, 0x00, 0x00};
+                uint32_t color32 = SDL_MapRGB(surface->format, color.r, color.g, color.b);
+                double event_width = (double)slider_rect.w / (double)events.len;
+                double x = slider_rect.x;
+                for (size_t i = 0; i < events.len + 1; ++i) {
+                    SDL_Rect line_rect = {x, slider_rect.y, 1, slider_rect.h};
+                    SDL_FillRect(surface, &line_rect, color32);
+                    x += event_width;
                 }
             }
         }
