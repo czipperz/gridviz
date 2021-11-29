@@ -8,7 +8,6 @@ namespace gridviz {
 
 enum Event_Type {
     EVENT_CHAR_POINT,
-    EVENT_KEY_FRAME,
 };
 
 union Event {
@@ -20,11 +19,6 @@ union Event {
         uint8_t ch;
         int64_t x, y;
     } cp;
-    struct {
-        uint8_t type;
-        uint64_t padding;
-        cz::Str message;
-    } kf;
 };
 
 struct Stroke {

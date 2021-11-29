@@ -229,10 +229,6 @@ int actual_main(int argc, char** argv) {
                         (void)render_code_point(run_font, surface, x, y, bg, fg, seq);
                     } break;
 
-                    case EVENT_KEY_FRAME:
-                        CZ_PANIC("todo");
-                        break;
-
                     default:
                         CZ_DEBUG_ASSERT(false);  // Ignore in release mode.
                         break;
