@@ -174,6 +174,8 @@ int actual_main(int argc, char** argv) {
             case SDL_KEYDOWN:
                 if (event.key.keysym.sym == SDLK_ESCAPE)
                     return 0;
+
+                // Set selected stroke.
                 if (event.key.keysym.sym == SDLK_UP && the_run) {
                     if (the_run->selected_stroke >= the_run->strokes.len &&
                         the_run->strokes.len > 0) {
@@ -186,6 +188,21 @@ int actual_main(int argc, char** argv) {
                     if (the_run->selected_stroke < the_run->strokes.len)
                         the_run->selected_stroke++;
                 }
+
+                // Set selected run.
+                if (event.key.keysym.sym == SDLK_LEFT) {
+                    if (game.selected_run > 0)
+                        game.selected_run--;
+                    the_run =
+                        (game.selected_run < game.runs.len ? &game.runs[game.selected_run] : NULL);
+                }
+                if (event.key.keysym.sym == SDLK_RIGHT) {
+                    if (game.selected_run < game.runs.len)
+                        game.selected_run++;
+                    the_run =
+                        (game.selected_run < game.runs.len ? &game.runs[game.selected_run] : NULL);
+                }
+
                 break;
             }
         }
