@@ -204,6 +204,9 @@ int netgridviz_connect(int port) {
 /////////////////////////////////////////////////
 
 void netgridviz_disconnect(void) {
+    if (netgridviz_socket == INVALID_SOCKET)
+        return;
+
     closesocket(netgridviz_socket);
     netgridviz_winsock_end();
 }
@@ -378,6 +381,9 @@ static uint8_t netgridviz_has_stroke;
 void netgridviz_start_stroke(const char* title) {
     netgridviz_has_stroke = 1;
 
+    if (netgridviz_socket == INVALID_SOCKET)
+        return;
+
     if (!title)
         title = "";
 
@@ -432,6 +438,9 @@ void netgridviz_draw_char(netgridviz_context* context, int64_t x, int64_t y, cha
 }
 
 void netgridviz_draw_string(netgridviz_context* context, int64_t x, int64_t y, const char* string) {
+    if (netgridviz_socket == INVALID_SOCKET)
+        return;
+
     uint8_t has_stroke = netgridviz_has_stroke;
     if (!has_stroke) {
         netgridviz_start_dummy_stroke();
